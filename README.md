@@ -1,37 +1,97 @@
-# DayNight
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="DayNight app icon">
+</p>
 
-A menu-bar utility that fades every Apple display and the MacBook keyboard
-backlight between two presets: Day and Night.
+<h1 align="center">DayNight</h1>
 
-- **Click** the icon to switch between Day and Night with a short fade. If the
-  brightness was changed by hand, a click goes to the preset farther away.
-- **Right-click** (or Control-click) to open the panel: click a preset's name
-  to apply it, drag its sliders to adjust it (the active preset updates live),
-  and turn Open at Login on or off.
+<p align="center">
+  One click to dim your screens and keyboard light for the night, and one click to bring them back.
+</p>
 
-The icon shows a sun for Day, a moon for Night, and a half-filled circle when
-the brightness matches neither. A display that connects while Day or Night is
-active joins that preset. Keyboard auto-brightness is paused while DayNight
-runs and restored when it quits, even after a crash.
+<p align="center">
+  macOS 26 or later &nbsp;·&nbsp; Free and open source
+</p>
 
-Day defaults to 100 % screens and keyboard; Night to 20 % screens and 10 %
-keyboard.
+---
 
-## Build
+Getting a Mac ready for the evening means turning down each screen and the keyboard light one at a time, then turning them all back up in the morning.
 
-Requires macOS 26 and Xcode 26 or later.
+DayNight does it in one click. It sits in your menu bar: click it for Night and every screen and the keyboard light fade down together. Click again for Day.
 
-```sh
-make test      # unit tests
-make app       # .build/DayNight.app, ad-hoc signed
-make install   # quit the running copy, install to /Applications, open it
+<p align="center">
+  <img src="docs/panel.png" width="416" alt="The DayNight panel, open below its icon in the menu bar, with sliders for Day and Night">
+</p>
+
+- **Everything at once.** Every screen and the keyboard light fade together in about half a second.
+- **Your levels.** Choose how bright Day and Night are, for the screens and the keyboard separately.
+- **New screens join in.** Plug in a display while Day or Night is on and it matches the others.
+- **Keeps your keyboard light where you put it.** macOS won't nudge it with the room's light while DayNight runs.
+- **Nothing to set up.** No permissions to grant. It opens at login and changes nothing until you click.
+- **Private.** No account, no tracking, and it never connects to the internet.
+
+## Install
+
+You need macOS 26 or later and [Xcode](https://apps.apple.com/app/xcode/id497799835) 26 or later (free from the App Store). In Terminal, run:
+
+```bash
+git clone https://github.com/racejohnson/daynight-menubar-app.git
+cd daynight-menubar-app
+make install
 ```
 
-`make hardware-check` drives the real displays and keyboard through Day, Night
-and recovery, then restores everything.
+This builds the app, puts it in your **Applications** folder and opens it. To update later, run `git pull` and `make install` again.
 
-## Caveat
+## Use it
 
-DayNight uses the private DisplayServices and CoreBrightness frameworks. It is
-meant for personal use on Apple Silicon Macs with Apple displays, may break with
-a macOS update, and cannot ship on the App Store. See `THIRD_PARTY_NOTICES.md`.
+DayNight has no Dock icon; it lives in your menu bar.
+
+- **Click** the icon to switch between Day and Night.
+- **Right-click** it (or Control-click) to open the panel:
+  - **Day** and **Night**: click a name to switch to it, and drag its sliders to set the screen and keyboard brightness. The one that's on is highlighted, and its sliders change the brightness as you drag.
+  - **Open at Login**: on by default.
+  - **Quit**.
+
+Out of the box, Day is 100% for the screens and keyboard, and Night is 20% for the screens and 10% for the keyboard.
+
+The icon shows <img src="docs/icon-day.png" height="20" alt="a sun"> for Day, <img src="docs/icon-night.png" height="20" alt="a moon"> for Night, and <img src="docs/icon-custom.png" height="20" alt="a half-filled circle"> when the brightness matches neither.
+
+## Questions
+
+**Which screens does it work with?**
+The built-in screen on a MacBook or iMac, and Apple displays such as Studio Display. Most other monitors don't let macOS set their brightness this way, so DayNight leaves them alone. The keyboard light is the backlight on a MacBook's built-in keyboard.
+
+**Why does the icon show a half circle?**
+The brightness doesn't match Day or Night, usually because you changed it with the brightness keys or Control Center. Click once to get back: DayNight picks whichever is the bigger change, so Night if your screens are bright and Day if they're dim.
+
+**Will it change my brightness when I log in?**
+No. DayNight only changes the brightness when you click.
+
+**My screens drift after I switch.**
+macOS may be adjusting them to the light in the room. To keep them exactly where DayNight puts them, turn off **Automatically adjust brightness** in **System Settings → Displays**.
+
+**What happens to my keyboard's automatic brightness?**
+DayNight turns it off the first time it sets the keyboard light, so your level doesn't drift. When you quit, it puts it back the way it was. If DayNight ever crashes, it puts it back the next time it opens.
+
+**Why isn't it on the App Store?**
+DayNight sets brightness through private parts of macOS that App Store apps aren't allowed to use. A future macOS update could change them. If that happens, DayNight can't change the brightness until it's updated, and nothing else is affected.
+
+**How do I uninstall it?**
+Right-click the icon, turn off **Open at Login** and click **Quit**. Then drag DayNight from Applications to the Trash.
+
+## For developers
+
+It's a Swift package; there's no Xcode project.
+
+```bash
+make run              # build a copy in .build and open it
+make test             # run the tests
+make hardware-check   # try Day and Night on your real screens, then restore them
+```
+
+Builds are signed ad hoc. **Open at Login** only works for the copy in Applications, so use `make install` to try it.
+
+The app icon is drawn in `Icon/AppIcon.svg`. `Icon/build-icon.sh` rebuilds `AppResources/Assets.car` and `AppIcon.icns` from it with `rsvg-convert` (`brew install librsvg`), or with Chromium if you set `PLAYWRIGHT` to a Playwright install.
+
+## License
+
+[MIT](LICENSE). The display and keyboard brightness code is adapted from [nriley/brightness](https://github.com/nriley/brightness) and [rakalex/mac-brightnessctl](https://github.com/rakalex/mac-brightnessctl); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). DayNight is an independent project, not affiliated with or endorsed by Apple.

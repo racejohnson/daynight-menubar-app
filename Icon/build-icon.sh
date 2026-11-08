@@ -15,7 +15,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(dirname "$HERE")"
 OUT="$ROOT/AppResources/AppIcon.icns"
-PLAYWRIGHT="${PLAYWRIGHT:-$HOME/Codex/velora-design-system/node_modules/playwright/index.mjs}"
+PLAYWRIGHT="${PLAYWRIGHT:-}"
 RENDERER="${RENDERER:-auto}"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/daynight-icon.XXXXXX")"
