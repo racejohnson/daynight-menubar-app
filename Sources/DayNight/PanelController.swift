@@ -26,7 +26,7 @@ final class PanelController {
         let glass = NSGlassEffectView()
         glass.cornerRadius = Self.cornerRadius
         glass.contentView = content
-        panel.contentView = glass
+        panel.contentView = RoundedClipView(content: glass, cornerRadius: Self.cornerRadius)
 
         content.onSizeChange = { [weak self] in self?.fit() }
         panel.onCancel = { [weak self] in self?.close() }
@@ -52,6 +52,7 @@ final class PanelController {
             context.duration = 0.12
             panel.animator().alphaValue = 1
         }
+        refreshShadow()
         startMonitoring()
         onVisibilityChange?(true)
     }
@@ -77,7 +78,13 @@ final class PanelController {
         let frame = NSRect(x: x, y: top - size.height, width: size.width, height: size.height)
         guard frame != panel.frame else { return }
         panel.setFrame(frame, display: true)
-        panel.invalidateShadow()
+        refreshShadow()
+    }
+
+    /// The window server traces the shadow and edge from what the window has
+    /// drawn, so recompute it once the glass has rendered at its new size.
+    private func refreshShadow() {
+        DispatchQueue.main.async { [panel] in panel.invalidateShadow() }
     }
 
     private func startMonitoring() {
@@ -150,6 +157,29 @@ private final class FloatingPanel: NSPanel {
         }
         return super.performKeyEquivalent(with: event)
     }
+}
+
+/// Clips the window to the panel's rounded shape, so its corners are truly
+/// transparent and the window's shadow and edge follow the curve.
+private final class RoundedClipView: NSView {
+    init(content: NSView, cornerRadius: CGFloat) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        content.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: trailingAnchor),
+            content.topAnchor.constraint(equalTo: topAnchor),
+            content.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
 /// Reports SwiftUI content-size changes so the panel can refit while open.
