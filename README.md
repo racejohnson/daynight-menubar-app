@@ -19,7 +19,7 @@ Getting a Mac ready for the evening means turning down each screen and the keybo
 DayNight does it in one click. It sits in your menu bar: click it for Night and every screen and the keyboard light fade down together. Click again for Day.
 
 <p align="center">
-  <img src="docs/panel.png" width="416" alt="The DayNight panel, open below its icon in the menu bar, with sliders for Day and Night">
+  <img src="docs/panel.png" width="700" alt="The DayNight panel open below its menu-bar icon, twice: Day switched on in light mode, and Night switched on in dark mode">
 </p>
 
 - **Everything at once.** Every screen and the keyboard light fade together in about half a second.
