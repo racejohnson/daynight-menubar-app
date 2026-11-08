@@ -1,189 +1,104 @@
+// Exercises the real displays and keyboard backlight end to end, then puts
+// every level and the keyboard auto-brightness setting back as it found them.
+// Needs the built-in display, a second Apple display and a backlit keyboard.
+
 import DayNightCore
 import Foundation
 
-private enum CheckError: Error, CustomStringConvertible {
-    case failed(String)
-
-    var description: String {
-        switch self {
-        case .failed(let message): return message
-        }
-    }
+struct CheckFailure: Error, CustomStringConvertible {
+    let description: String
 }
 
-private func require(_ condition: @autoclosure () -> Bool, _ message: String)
-throws {
-    if !condition() { throw CheckError.failed(message) }
+func require(_ condition: Bool, _ message: @autoclosure () -> String) throws {
+    if !condition { throw CheckFailure(description: message()) }
 }
 
-private func describe(_ snapshot: HardwareSnapshot) -> String {
-    let displays = snapshot.displayValues.keys.sorted().map {
-        String(format: "0x%x=%.1f%%", $0, (snapshot.displayValues[$0] ?? 0) * 100)
-    }.joined(separator: ", ")
-    let keyboard = snapshot.keyboardValue.map {
-        String(format: "%.1f%%", $0 * 100)
-    } ?? "unavailable"
-    return "displays [\(displays)], keyboard \(keyboard)"
+func describe(_ snapshot: HardwareSnapshot) -> String {
+    let displays = snapshot.displays.keys.sorted().map {
+        String(format: "0x%x=%.1f%%", $0, snapshot.displays[$0]! * 100)
+    }
+    let keyboard = snapshot.keyboard.map { String(format: "%.1f%%", $0 * 100) } ?? "unavailable"
+    return "displays [\(displays.joined(separator: ", "))], keyboard \(keyboard)"
 }
 
-private func verify(
-    _ snapshot: HardwareSnapshot,
-    preset: BrightnessPreset,
-    label: String
-) throws {
-    try require(snapshot.displayValues.count >= 2,
-                "\(label): fewer than two controllable Apple displays")
-    for (id, value) in snapshot.displayValues {
-        try require(
-            abs(value - preset.screen) <= 0.02,
-            String(format: "%@: display 0x%x is %.1f%%", label, id, value * 100)
-        )
-    }
-    guard let keyboard = snapshot.keyboardValue else {
-        throw CheckError.failed("\(label): keyboard unavailable")
-    }
-    try require(
-        abs(keyboard - preset.keyboard) <= 0.02,
-        String(format: "%@: keyboard is %.1f%%", label, keyboard * 100)
-    )
+func verify(_ snapshot: HardwareSnapshot, matches preset: BrightnessPreset, _ label: String) throws {
+    try require(StateEngine.matches(snapshot, preset), "\(label): \(describe(snapshot))")
 }
 
-private func runCheck() throws {
-    let displays = NativeDisplayController()
-    let keyboard = NativeKeyboardController()
-    let baseline = HardwareReader.capture(
-        displayController: displays,
-        keyboardController: keyboard
-    )
-    let baselineAuto = keyboard.autoBrightnessEnabled()
-    print("Baseline: \(describe(baseline)); keyboard auto \(String(describing: baselineAuto))")
+func verifyFade(_ report: TransitionReport, _ label: String) throws {
+    let seconds = report.elapsed / .seconds(1)
+    try require(!report.hasFailures, "\(label): a control reported failure")
+    try require((0.55...1.2).contains(seconds), "\(label): fade took \(seconds) s")
+    print(String(format: "%@ fade (%.3f s): PASS", label, seconds))
+}
 
-    try require(baseline.displayValues.count >= 2,
-                "Expected both built-in and Studio Display")
-    try require(baseline.keyboardValue != nil, "Built-in keyboard is unavailable")
-    guard let baselineAuto else {
-        throw CheckError.failed("Could not read keyboard auto-brightness")
-    }
+let displays = SystemDisplays()
+let keyboard = SystemKeyboard()
+let suite = "DayNightHardwareCheck.\(UUID().uuidString)"
+let controller = BrightnessController(displays: displays, keyboard: keyboard, defaultsSuite: suite)
 
-    let suite = "DayNightHardwareCheck.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defaults.removePersistentDomain(forName: suite)
-    let recovery = KeyboardAutoBrightnessRecovery(
-        keyboardController: keyboard,
-        defaults: defaults
-    )
+let baseline = await controller.snapshot()
+let baselineAuto = keyboard.isAutoBrightnessEnabled()
+print("Baseline: \(describe(baseline)); keyboard auto-brightness \(baselineAuto.map(String.init) ?? "unknown")")
 
-    defer {
-        for (id, value) in baseline.displayValues {
-            _ = displays.setBrightness(value, displayID: id)
-        }
-        if let value = baseline.keyboardValue {
-            _ = keyboard.setBrightness(value)
-        }
-        _ = recovery.restoreOnQuit()
-        _ = keyboard.setAutoBrightnessEnabled(baselineAuto)
-        defaults.removePersistentDomain(forName: suite)
-        Thread.sleep(forTimeInterval: 0.15)
-        let restored = HardwareReader.capture(
-            displayController: displays,
-            keyboardController: keyboard
-        )
-        print("Restored: \(describe(restored)); keyboard auto \(String(describing: keyboard.autoBrightnessEnabled()))")
-    }
-
-    try require(recovery.prepareForControl() == .succeeded,
-                "Could not snapshot/disable keyboard auto-brightness")
-    try require(keyboard.autoBrightnessEnabled() == false,
-                "Keyboard auto-brightness did not disable")
-    print("Auto-brightness snapshot and disable: PASS")
-
-    let dayReport = TransitionRunner.run(
-        displayController: displays,
-        keyboardController: keyboard,
-        preset: .defaultDay,
-        duration: 0.6
-    )
-    let daySnapshot = HardwareReader.capture(
-        displayController: displays,
-        keyboardController: keyboard
-    )
-    try verify(daySnapshot, preset: .defaultDay, label: "Day")
-    try require(dayReport.elapsed >= 0.55 && dayReport.elapsed <= 1.2,
-                "Day fade timing was \(dayReport.elapsed) seconds")
-    try require(dayReport.failedDisplayIDs.isEmpty && !dayReport.keyboardFailed,
-                "Day transition reported a control failure")
-    print(String(format: "Day target and fade (%.3f s): PASS — %@",
-                 dayReport.elapsed, describe(daySnapshot)))
-
-    let nightReport = TransitionRunner.run(
-        displayController: displays,
-        keyboardController: keyboard,
-        preset: .defaultNight,
-        duration: 0.6
-    )
-    let nightSnapshot = HardwareReader.capture(
-        displayController: displays,
-        keyboardController: keyboard
-    )
-    try verify(nightSnapshot, preset: .defaultNight, label: "Night")
-    try require(nightReport.elapsed >= 0.55 && nightReport.elapsed <= 1.2,
-                "Night fade timing was \(nightReport.elapsed) seconds")
-    try require(nightReport.failedDisplayIDs.isEmpty && !nightReport.keyboardFailed,
-                "Night transition reported a control failure")
-    print(String(format: "Night target and fade (%.3f s): PASS — %@",
-                 nightReport.elapsed, describe(nightSnapshot)))
-
-    guard let changedDisplayID = nightSnapshot.displayValues.keys.sorted().first
-    else {
-        throw CheckError.failed("No display available for Custom-state check")
-    }
-    try require(displays.setBrightness(0.35, displayID: changedDisplayID),
-                "Could not make a manual display-brightness change")
-    Thread.sleep(forTimeInterval: 0.12)
-    let customSnapshot = HardwareReader.capture(
-        displayController: displays,
-        keyboardController: keyboard
-    )
-    let inferred = StateEngine.infer(
-        snapshot: customSnapshot,
-        day: .defaultDay,
-        night: .defaultNight
-    )
-    let clickTarget = StateEngine.modeForClick(
-        inferredState: inferred,
-        snapshot: customSnapshot,
-        day: .defaultDay,
-        night: .defaultNight,
-        lastAppliedMode: .night
-    )
-    try require(inferred == .custom, "Manual change did not infer Custom")
-    try require(clickTarget == .day,
-                "Custom click did not choose the opposite of nearest Night")
-    print("Manual change → Custom → next click Day: PASS")
-
-    try require(recovery.restoreOnQuit() == .succeeded,
-                "Quit restoration of keyboard auto-brightness failed")
-    try require(keyboard.autoBrightnessEnabled() == baselineAuto,
-                "Quit restoration produced the wrong auto-brightness state")
-    print("Quit restoration: PASS")
-
-    try require(recovery.prepareForControl() == .succeeded,
-                "Could not prepare abnormal-exit recovery test")
-    let relaunchedRecovery = KeyboardAutoBrightnessRecovery(
-        keyboardController: keyboard,
-        defaults: defaults
-    )
-    try require(relaunchedRecovery.recoverIfNeeded() == .succeeded,
-                "Abnormal-exit recovery failed")
-    try require(keyboard.autoBrightnessEnabled() == baselineAuto,
-                "Abnormal-exit recovery restored the wrong state")
-    print("Abnormal-exit next-launch recovery: PASS")
+func restoreBaseline() async {
+    for (id, value) in baseline.displays { _ = displays.setBrightness(value, of: id) }
+    if let value = baseline.keyboard { _ = keyboard.setBrightness(value) }
+    if let baselineAuto { _ = keyboard.setAutoBrightnessEnabled(baselineAuto) }
+    UserDefaults.standard.removePersistentDomain(forName: suite)
+    try? await Task.sleep(for: .milliseconds(150))
+    print("Restored: \(describe(await controller.snapshot()))")
 }
 
 do {
-    try runCheck()
+    try require(baseline.displays.count >= 2, "Expected the built-in display and a second Apple display")
+    try require(baseline.keyboard != nil, "Built-in keyboard backlight is unavailable")
+    try require(baselineAuto != nil, "Could not read keyboard auto-brightness")
+
+    let day = await controller.transition(to: .defaultDay)
+    try verify(await controller.snapshot(), matches: .defaultDay, "Day")
+    try verifyFade(day, "Day")
+    try require(keyboard.isAutoBrightnessEnabled() == false, "Auto-brightness was not turned off")
+    print("Auto-brightness snapshot and disable: PASS")
+
+    let night = await controller.transition(to: .defaultNight)
+    try verify(await controller.snapshot(), matches: .defaultNight, "Night")
+    try verifyFade(night, "Night")
+
+    let instant = await controller.transition(to: .defaultDay, duration: .zero)
+    try verify(await controller.snapshot(), matches: .defaultDay, "Instant Day")
+    try require(!instant.hasFailures, "Instant apply reported a failure")
+    print("Instant apply: PASS")
+    _ = await controller.transition(to: .defaultNight, duration: .zero)
+
+    let manual = baseline.displays.keys.sorted()[0]
+    try require(displays.setBrightness(0.35, of: manual), "Could not make a manual display change")
+    try await Task.sleep(for: .milliseconds(120))
+    let custom = await controller.snapshot()
+    let state = StateEngine.infer(custom, day: .defaultDay, night: .defaultNight)
+    try require(state == .custom, "A manual change did not read as Custom")
+    let target = StateEngine.clickTarget(
+        from: state, snapshot: custom, day: .defaultDay, night: .defaultNight, lastApplied: .night
+    )
+    try require(target == .day, "Custom near Night should click to Day")
+    print("Manual change → Custom → next click Day: PASS")
+
+    try require(await controller.restoreAutoBrightness() == .succeeded, "Quit restoration failed")
+    try require(keyboard.isAutoBrightnessEnabled() == baselineAuto, "Quit restored the wrong setting")
+    print("Quit restoration: PASS")
+
+    // The first session is closed now; a second one stands in for a crashed run.
+    let crashed = BrightnessController(displays: displays, keyboard: keyboard, defaultsSuite: suite)
+    _ = await crashed.transition(to: .defaultNight, duration: .zero)
+    let relaunched = BrightnessController(displays: displays, keyboard: keyboard, defaultsSuite: suite)
+    try require(await relaunched.recoverLeftoverAutoBrightness() == .succeeded, "Crash recovery failed")
+    try require(keyboard.isAutoBrightnessEnabled() == baselineAuto, "Crash recovery restored the wrong setting")
+    print("Abnormal-exit next-launch recovery: PASS")
+
+    await restoreBaseline()
     print("DAYNIGHT HARDWARE CHECK: PASS")
 } catch {
-    fputs("DAYNIGHT HARDWARE CHECK: FAIL — \(error)\n", stderr)
+    await restoreBaseline()
+    FileHandle.standardError.write(Data("DAYNIGHT HARDWARE CHECK: FAIL — \(error)\n".utf8))
     exit(1)
 }

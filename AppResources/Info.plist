@@ -9,6 +9,10 @@
   <string>DayNight</string>
   <key>CFBundleExecutable</key>
   <string>DayNight</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundleIconName</key>
+  <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
   <string>com.racejohnson.DayNight</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -18,15 +22,19 @@
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
+  <string>2.0</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>2</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.utilities</string>
   <key>LSMinimumSystemVersion</key>
-  <string>15.0</string>
+  <string>26.0</string>
   <key>LSUIElement</key>
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSHumanReadableCopyright</key>
+  <string>© 2026 Race Johnson</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
 </dict>

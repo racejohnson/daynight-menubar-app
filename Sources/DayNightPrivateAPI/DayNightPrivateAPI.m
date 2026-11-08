@@ -47,11 +47,6 @@ static void DNLoadDisplayServices(void) {
     });
 }
 
-bool DNDisplayServicesAvailable(void) {
-    DNLoadDisplayServices();
-    return dnDisplayServicesLoaded;
-}
-
 bool DNDisplayCanChangeBrightness(uint32_t displayID) {
     DNLoadDisplayServices();
     return dnDisplayServicesLoaded && dnCanChangeBrightness(displayID);

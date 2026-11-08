@@ -4,11 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// Thin C wrappers over private DisplayServices and CoreBrightness symbols.
+// Each returns false when the framework, the symbol or the device is missing.
 
-bool DNDisplayServicesAvailable(void);
 bool DNDisplayCanChangeBrightness(uint32_t displayID);
 bool DNDisplayGetBrightness(uint32_t displayID, float *brightness);
 bool DNDisplaySetBrightness(uint32_t displayID, float brightness);
@@ -18,9 +16,5 @@ bool DNKeyboardGetBrightness(float *brightness);
 bool DNKeyboardSetBrightness(float brightness);
 bool DNKeyboardGetAutoBrightness(bool *enabled);
 bool DNKeyboardSetAutoBrightness(bool enabled);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

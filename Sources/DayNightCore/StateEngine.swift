@@ -1,101 +1,65 @@
-import Foundation
-
+/// Pure rules that turn hardware readings into a state and a click into a target.
 public enum StateEngine {
-    public static let defaultTolerance = 0.02
+    public static let tolerance = 0.02
 
+    /// Day or Night when every available channel is within tolerance of that
+    /// preset; a reading that matches both resolves to the last applied mode.
     public static func infer(
-        snapshot: HardwareSnapshot,
+        _ snapshot: HardwareSnapshot,
         day: BrightnessPreset,
         night: BrightnessPreset,
-        tolerance: Double = defaultTolerance,
-        lastAppliedMode: DayNightMode? = nil
-    ) -> DayNightMode {
-        guard snapshot.availableChannelCount > 0 else { return .custom }
-
-        let dayMatches = matches(
-            snapshot: snapshot, preset: day, tolerance: tolerance
-        )
-        let nightMatches = matches(
-            snapshot: snapshot, preset: night, tolerance: tolerance
-        )
-
-        switch (dayMatches, nightMatches) {
-        case (true, false):
-            return .day
-        case (false, true):
-            return .night
-        case (true, true):
-            if lastAppliedMode == .night { return .night }
-            return .day
-        case (false, false):
-            return .custom
+        lastApplied: Mode? = nil,
+        tolerance: Double = tolerance
+    ) -> BrightnessState {
+        switch (
+            matches(snapshot, day, tolerance: tolerance),
+            matches(snapshot, night, tolerance: tolerance)
+        ) {
+        case (true, false): .day
+        case (false, true): .night
+        case (true, true): lastApplied == .night ? .night : .day
+        case (false, false): .custom
         }
     }
 
     public static func matches(
-        snapshot: HardwareSnapshot,
-        preset: BrightnessPreset,
-        tolerance: Double = defaultTolerance
+        _ snapshot: HardwareSnapshot,
+        _ preset: BrightnessPreset,
+        tolerance: Double = tolerance
     ) -> Bool {
-        guard snapshot.availableChannelCount > 0 else { return false }
-        let permittedDifference = max(0, tolerance)
-
-        let displaysMatch = snapshot.displayValues.values.allSatisfy {
-            abs($0 - preset.screen) <= permittedDifference
-        }
-        let keyboardMatches = snapshot.keyboardValue.map {
-            abs($0 - preset.keyboard) <= permittedDifference
-        } ?? true
-        return displaysMatch && keyboardMatches
+        guard snapshot.channelCount > 0 else { return false }
+        let limit = max(0, tolerance)
+        return snapshot.displays.values.allSatisfy { abs($0 - preset.screen) <= limit }
+            && snapshot.keyboard.map { abs($0 - preset.keyboard) <= limit } ?? true
     }
 
-    public static func modeForClick(
-        inferredState: DayNightMode,
+    /// The mode a primary click should apply. From Custom it goes to the preset
+    /// farther from the current reading (the opposite of the nearest one); an
+    /// exact tie flips the last applied mode, or goes to Night.
+    public static func clickTarget(
+        from state: BrightnessState,
         snapshot: HardwareSnapshot,
         day: BrightnessPreset,
         night: BrightnessPreset,
-        lastAppliedMode: DayNightMode?
-    ) -> DayNightMode {
-        switch inferredState {
-        case .day:
-            return .night
-        case .night:
-            return .day
-        case .custom:
-            let dayDistance = distance(from: snapshot, to: day)
-            let nightDistance = distance(from: snapshot, to: night)
-            if abs(dayDistance - nightDistance) <= 0.000_000_1 {
-                if let lastAppliedMode,
-                   lastAppliedMode == .day || lastAppliedMode == .night {
-                    return lastAppliedMode.opposite
-                }
-                return .night
-            }
-            return dayDistance < nightDistance ? .night : .day
+        lastApplied: Mode?
+    ) -> Mode {
+        if let mode = state.mode { return mode.opposite }
+        let toDay = distance(snapshot, day)
+        let toNight = distance(snapshot, night)
+        if abs(toDay - toNight) <= 1e-7 {
+            return lastApplied?.opposite ?? .night
         }
+        return toDay < toNight ? .night : .day
     }
 
-    public static func distance(
-        from snapshot: HardwareSnapshot,
-        to preset: BrightnessPreset
-    ) -> Double {
-        let screenDistance = snapshot.displayValues.values.reduce(0) {
-            $0 + abs($1 - preset.screen)
-        }
-        let keyboardDistance = snapshot.keyboardValue.map {
-            abs($0 - preset.keyboard)
-        } ?? 0
-        return screenDistance + keyboardDistance
+    /// Sum of absolute differences across every available channel.
+    public static func distance(_ snapshot: HardwareSnapshot, _ preset: BrightnessPreset) -> Double {
+        snapshot.displays.values.reduce(0) { $0 + abs($1 - preset.screen) }
+            + (snapshot.keyboard.map { abs($0 - preset.keyboard) } ?? 0)
     }
-}
 
-public enum LivePreviewPolicy {
-    public static func shouldPreview(
-        editedMode: DayNightMode,
-        inferredState: DayNightMode,
-        applyingMode: DayNightMode?
-    ) -> Bool {
-        guard editedMode == .day || editedMode == .night else { return false }
-        return inferredState == editedMode || applyingMode == editedMode
+    /// Editing a preset previews it live only while it is (or is becoming) the active one.
+    public static func shouldPreview(edited: Mode, state: BrightnessState, fadingTo: Mode?) -> Bool {
+        state.mode == edited || fadingTo == edited
     }
 }

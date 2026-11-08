@@ -1,25 +1,37 @@
 # DayNight
 
-DayNight is a native, Dockless macOS menu-bar utility for synchronizing the
-normal brightness of Apple displays and a MacBook keyboard.
+A menu-bar utility that fades every Apple display and the MacBook keyboard
+backlight between two presets: Day and Night.
 
-- Left-click the menu-bar icon to toggle Day/Night immediately.
-- Right-click for editable presets, launch-at-login status, explicit Apply
-  actions, and Quit.
-- Day defaults to 100% screens/100% keyboard.
-- Night defaults to 20% screens/10% keyboard.
+- **Click** the icon to switch between Day and Night with a short fade. If the
+  brightness was changed by hand, a click goes to the preset farther away.
+- **Right-click** (or Control-click) to open the panel: click a preset's name
+  to apply it, drag its sliders to adjust it (the active preset updates live),
+  and turn Open at Login on or off.
 
-The app uses private macOS DisplayServices and CoreBrightness APIs. It is
-intended for local use on the tested Apple Silicon Mac and is not suitable for
-App Store distribution. See `THIRD_PARTY_NOTICES.md`.
+The icon shows a sun for Day, a moon for Night, and a half-filled circle when
+the brightness matches neither. A display that connects while Day or Night is
+active joins that preset. Keyboard auto-brightness is paused while DayNight
+runs and restored when it quits, even after a crash.
+
+Day defaults to 100 % screens and keyboard; Night to 20 % screens and 10 %
+keyboard.
 
 ## Build
 
+Requires macOS 26 and Xcode 26 or later.
+
 ```sh
-make test
-make app
-make install
+make test      # unit tests
+make app       # .build/DayNight.app, ad-hoc signed
+make install   # quit the running copy, install to /Applications, open it
 ```
 
-`make install` produces an ad-hoc locally signed app at
-`/Applications/DayNight.app`.
+`make hardware-check` drives the real displays and keyboard through Day, Night
+and recovery, then restores everything.
+
+## Caveat
+
+DayNight uses the private DisplayServices and CoreBrightness frameworks. It is
+meant for personal use on Apple Silicon Macs with Apple displays, may break with
+a macOS update, and cannot ship on the App Store. See `THIRD_PARTY_NOTICES.md`.

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+<!-- DayNight 16/32 art: a flat pixel drawing, not a downscale. Elements marked data-min="32" are dropped at 16 and data-max="16" at 32 (build-icon.sh): the 16 disc is a 6 px pixel drawing. -->
+<defs>
+  <clipPath id="t"><path d="M11.63,2 L20.37,2 C23.14,2 24.53,2 26.02,2.47 C27.65,3.07 28.93,4.35 29.53,5.98 C30,7.47 30,8.86 30,11.63 L30,20.37 C30,23.14 30,24.53 29.53,26.02 C28.93,27.65 27.65,28.93 26.02,29.53 C24.53,30 23.14,30 20.37,30 L11.63,30 C8.86,30 7.47,30 5.98,29.53 C4.35,28.93 3.07,27.65 2.47,26.02 C2,24.53 2,23.14 2,20.37 L2,11.63 C2,8.86 2,7.47 2.47,5.98 C3.07,4.35 4.35,3.07 5.98,2.47 C7.47,2 8.86,2 11.63,2 Z"/></clipPath>
+  <linearGradient id="d" x1="0" y1="2" x2="0" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#efcfac"/><stop offset="1" stop-color="#f1bf93"/></linearGradient>
+  <linearGradient id="n" x1="0" y1="18" x2="0" y2="30" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2a326f"/><stop offset="1" stop-color="#0b0c22"/></linearGradient>
+</defs>
+<g clip-path="url(#t)">
+  <rect width="32" height="18" fill="url(#d)"/>
+  <rect y="18" width="32" height="14" fill="url(#n)"/>
+  <rect y="18" width="32" height="1" fill="#4a56b8" opacity=".55" data-min="32"/>
+  <path d="M9,18 A7,7 0 0 1 23,18 Z" fill="#e9603b" data-min="32"/>
+  <path d="M9,18 A7,7 0 0 0 23,18 Z" fill="#f5f2ec" data-min="32"/>
+  <path d="M12,12 H20 V14 H22 V18 H10 V14 H12 Z" fill="#e9603b" data-max="16"/>
+  <path d="M10,18 H22 V22 H20 V24 H12 V22 H10 Z" fill="#f5f2ec" data-max="16"/>
+</g>
+</svg>

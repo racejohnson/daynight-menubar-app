@@ -1,93 +1,59 @@
-import Foundation
+/// One of the two brightness presets.
+public enum Mode: String, Sendable {
+    case day
+    case night
 
-public enum DayNightMode: String, Codable, CaseIterable, Equatable {
+    public var opposite: Mode { self == .day ? .night : .day }
+}
+
+/// What the hardware currently looks like: one of the presets, or neither.
+public enum BrightnessState: Equatable, Sendable {
     case day
     case night
     case custom
 
-    public var opposite: DayNightMode {
+    public init(_ mode: Mode) {
+        self = mode == .day ? .day : .night
+    }
+
+    public var mode: Mode? {
         switch self {
-        case .day: return .night
-        case .night: return .day
-        case .custom: return .custom
+        case .day: .day
+        case .night: .night
+        case .custom: nil
         }
     }
 }
 
-public struct BrightnessPreset: Equatable {
-    public var screen: Double
-    public var keyboard: Double
+/// Screen and keyboard-backlight levels, each clamped to 0...1.
+public struct BrightnessPreset: Equatable, Sendable {
+    public var screen: Double { didSet { screen = Self.clamp(screen) } }
+    public var keyboard: Double { didSet { keyboard = Self.clamp(keyboard) } }
 
     public init(screen: Double, keyboard: Double) {
-        self.screen = BrightnessPreset.clamp(screen)
-        self.keyboard = BrightnessPreset.clamp(keyboard)
-    }
-
-    public static func clamp(_ value: Double) -> Double {
-        guard value.isFinite else { return 0 }
-        return min(1, max(0, value))
+        self.screen = Self.clamp(screen)
+        self.keyboard = Self.clamp(keyboard)
     }
 
     public static let defaultDay = BrightnessPreset(screen: 1, keyboard: 1)
     public static let defaultNight = BrightnessPreset(screen: 0.2, keyboard: 0.1)
-}
 
-public struct HardwareSnapshot: Equatable {
-    public var displayValues: [UInt32: Double]
-    public var keyboardValue: Double?
-
-    public init(
-        displayValues: [UInt32: Double] = [:],
-        keyboardValue: Double? = nil
-    ) {
-        self.displayValues = displayValues.mapValues(BrightnessPreset.clamp)
-        self.keyboardValue = keyboardValue.map(BrightnessPreset.clamp)
-    }
-
-    public var allChannelValues: [Double] {
-        displayValues.keys.sorted().compactMap { displayValues[$0] }
-            + (keyboardValue.map { [$0] } ?? [])
-    }
-
-    public var availableChannelCount: Int {
-        displayValues.count + (keyboardValue == nil ? 0 : 1)
+    public static func clamp(_ value: Double) -> Double {
+        value.isFinite ? min(1, max(0, value)) : 0
     }
 }
 
-public struct HardwarePollResult {
-    public let snapshot: HardwareSnapshot
-    public let newlyAvailableDisplayIDs: Set<UInt32>
+/// Brightness of every controllable display, plus the keyboard backlight when present.
+public struct HardwareSnapshot: Equatable, Sendable {
+    public var displays: [UInt32: Double]
+    public var keyboard: Double?
 
-    public init(
-        snapshot: HardwareSnapshot,
-        newlyAvailableDisplayIDs: Set<UInt32>
-    ) {
-        self.snapshot = snapshot
-        self.newlyAvailableDisplayIDs = newlyAvailableDisplayIDs
+    public init(displays: [UInt32: Double] = [:], keyboard: Double? = nil) {
+        self.displays = displays.mapValues(BrightnessPreset.clamp)
+        self.keyboard = keyboard.map(BrightnessPreset.clamp)
     }
-}
 
-public struct TransitionReport {
-    public let elapsed: TimeInterval
-    public let displayIDsAttempted: Set<UInt32>
-    public let failedDisplayIDs: Set<UInt32>
-    public let keyboardAttempted: Bool
-    public let keyboardFailed: Bool
-    public let cancelled: Bool
-
-    public init(
-        elapsed: TimeInterval,
-        displayIDsAttempted: Set<UInt32>,
-        failedDisplayIDs: Set<UInt32>,
-        keyboardAttempted: Bool,
-        keyboardFailed: Bool,
-        cancelled: Bool
-    ) {
-        self.elapsed = elapsed
-        self.displayIDsAttempted = displayIDsAttempted
-        self.failedDisplayIDs = failedDisplayIDs
-        self.keyboardAttempted = keyboardAttempted
-        self.keyboardFailed = keyboardFailed
-        self.cancelled = cancelled
+    public var channelCount: Int {
+        displays.count + (keyboard == nil ? 0 : 1)
     }
 }
