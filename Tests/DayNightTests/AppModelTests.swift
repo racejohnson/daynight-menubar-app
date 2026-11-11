@@ -32,6 +32,36 @@ struct AppModelTests {
         }
     }
 
+    @Test func clickSwapsDayAndDim() async {
+        let displays = MockDisplays([1: 1, 2: 1])
+        let keyboard = MockKeyboard(1)
+        let model = await model(displays, keyboard)
+
+        model.toggle()
+        await waitUntil { lastApplied == "dim" && model.fadingTo == nil }
+        #expect(model.state == .dim)
+        #expect(displays.values == [1: 0.5, 2: 0.5])
+
+        model.toggle()
+        await waitUntil { lastApplied == "day" && model.fadingTo == nil }
+        #expect(model.state == .day)
+        #expect(displays.values == [1: 1, 2: 1])
+    }
+
+    @Test func optionClickGoesToNightAndAClickFromNightGoesToDay() async {
+        let displays = MockDisplays([1: 1])
+        let model = await model(displays, MockKeyboard(1))
+
+        model.toggle(alternate: true)
+        await waitUntil { lastApplied == "night" && model.fadingTo == nil }
+        #expect(model.state == .night)
+        #expect(displays.values == [1: 0.2])
+
+        model.toggle()
+        await waitUntil { lastApplied == "day" && model.fadingTo == nil }
+        #expect(model.state == .day)
+    }
+
     @Test func twoQuickClicksEndOppositeTheFirstTarget() async {
         let displays = MockDisplays([1: 1, 2: 1])
         let model = await model(displays, MockKeyboard(1))

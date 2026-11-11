@@ -5,7 +5,7 @@
 <h1 align="center">DayNight</h1>
 
 <p align="center">
-  One click to dim your screens and keyboard light for the night, and one click to bring them back.
+  One click to dim your screens and keyboard light, and one click to bring them back.
 </p>
 
 <p align="center">
@@ -16,15 +16,15 @@
 
 Getting a Mac ready for the evening means turning down each screen and the keyboard light one at a time, then turning them all back up in the morning.
 
-DayNight does it in one click. It sits in your menu bar: click it for Night and every screen and the keyboard light fade down together. Click again for Day.
+DayNight does it in one click. It sits in your menu bar with three settings: **Day** for full brightness, **Dim** for when you step away from the computer, and **Night** for overnight. Click it and every screen and the keyboard light fade down together. Click again and they come back.
 
 <p align="center">
-  <img src="docs/panel.png" width="700" alt="The DayNight panel open below its menu-bar icon, twice: Day switched on in light mode, and Night switched on in dark mode">
+  <img src="docs/panel.png" width="840" alt="The DayNight panel open below its menu-bar icon, three times: Day switched on and Dim switched on in light mode, and Night switched on in dark mode">
 </p>
 
 - **Everything at once.** Every screen and the keyboard light fade together in about half a second.
-- **Your levels.** Choose how bright Day and Night are, for the screens and the keyboard separately.
-- **New screens join in.** Plug in a display while Day or Night is on and it matches the others.
+- **Your levels.** Choose how bright Day, Dim and Night are, for the screens and the keyboard separately.
+- **New screens join in.** Plug in a display while Day, Dim or Night is on and it matches the others.
 - **Keeps your keyboard light where you put it.** macOS won't nudge it with the room's light while DayNight runs.
 - **Nothing to set up.** No permissions to grant. It opens at login and changes nothing until you click.
 - **Private.** No account, no tracking, and it never connects to the internet.
@@ -45,15 +45,16 @@ This builds the app, puts it in your **Applications** folder and opens it. To up
 
 DayNight has no Dock icon; it lives in your menu bar.
 
-- **Click** the icon to switch between Day and Night.
+- **Click** the icon to switch between Day and Dim. From Night, a click goes to Day.
+- **Option-click** it to switch to Night.
 - **Right-click** it (or Control-click) to open the panel:
-  - **Day** and **Night**: click a name to switch to it, and drag its sliders to set the screen and keyboard brightness. The one that's on is highlighted, and its sliders change the brightness as you drag.
+  - **Day**, **Dim** and **Night**: click a name to switch to it, and drag its sliders to set the screen and keyboard brightness. The one that's on is highlighted, and its sliders change the brightness as you drag.
   - **Open at Login**: on by default.
   - **Quit**.
 
-Out of the box, Day is 100% for the screens and keyboard, and Night is 20% for the screens and 10% for the keyboard.
+Out of the box, Day is 100% for the screens and keyboard, Dim is 50% for both, and Night is 20% for the screens and 10% for the keyboard.
 
-The icon shows <img src="docs/icon-day.png" height="20" alt="a sun"> for Day, <img src="docs/icon-night.png" height="20" alt="a moon"> for Night, and <img src="docs/icon-custom.png" height="20" alt="a half-filled circle"> when the brightness matches neither.
+The icon shows <img src="docs/icon-day.png" height="20" alt="a sun"> for Day, <img src="docs/icon-dim.png" height="20" alt="a sun on the horizon"> for Dim, <img src="docs/icon-night.png" height="20" alt="a moon"> for Night, and <img src="docs/icon-custom.png" height="20" alt="a half-filled circle"> when the brightness matches none of them.
 
 ## Questions
 
@@ -61,7 +62,7 @@ The icon shows <img src="docs/icon-day.png" height="20" alt="a sun"> for Day, <i
 The built-in screen on a MacBook or iMac, and Apple displays such as Studio Display. Most other monitors don't let macOS set their brightness this way, so DayNight leaves them alone. The keyboard light is the backlight on a MacBook's built-in keyboard.
 
 **Why does the icon show a half circle?**
-The brightness doesn't match Day or Night, usually because you changed it with the brightness keys or Control Center. Click once to get back: DayNight picks whichever is the bigger change, so Night if your screens are bright and Day if they're dim.
+The brightness doesn't match Day, Dim or Night, usually because you changed it with the brightness keys or Control Center. Click once to get back: DayNight picks whichever of Day and Dim is the bigger change, so Dim if your screens are bright and Day if they're dim.
 
 **Will it change my brightness when I log in?**
 No. DayNight only changes the brightness when you click.
@@ -85,7 +86,7 @@ It's a Swift package; there's no Xcode project.
 ```bash
 make run              # build a copy in .build and open it
 make test             # run the tests
-make hardware-check   # try Day and Night on your real screens, then restore them
+make hardware-check   # try Day, Dim and Night on your real screens, then restore them
 ```
 
 Builds are signed ad hoc. **Open at Login** only works for the copy in Applications, so use `make install` to try it.

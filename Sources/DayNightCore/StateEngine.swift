@@ -2,24 +2,18 @@
 public enum StateEngine {
     public static let tolerance = 0.02
 
-    /// Day or Night when every available channel is within tolerance of that
-    /// preset; a reading that matches both resolves to the last applied mode.
+    /// The mode whose preset every available channel is within tolerance of.
+    /// A reading that matches several resolves to the last applied mode, or
+    /// else to the brightest of them.
     public static func infer(
         _ snapshot: HardwareSnapshot,
-        day: BrightnessPreset,
-        night: BrightnessPreset,
+        presets: Presets,
         lastApplied: Mode? = nil,
         tolerance: Double = tolerance
     ) -> BrightnessState {
-        switch (
-            matches(snapshot, day, tolerance: tolerance),
-            matches(snapshot, night, tolerance: tolerance)
-        ) {
-        case (true, false): .day
-        case (false, true): .night
-        case (true, true): lastApplied == .night ? .night : .day
-        case (false, false): .custom
-        }
+        let matching = Mode.allCases.filter { matches(snapshot, presets[$0], tolerance: tolerance) }
+        if let lastApplied, matching.contains(lastApplied) { return BrightnessState(lastApplied) }
+        return matching.first.map(BrightnessState.init) ?? .custom
     }
 
     public static func matches(
@@ -33,23 +27,34 @@ public enum StateEngine {
             && snapshot.keyboard.map { abs($0 - preset.keyboard) <= limit } ?? true
     }
 
-    /// The mode a primary click should apply. From Custom it goes to the preset
-    /// farther from the current reading (the opposite of the nearest one); an
-    /// exact tie flips the last applied mode, or goes to Night.
+    /// The mode a click should apply.
+    ///
+    /// A plain click swaps Day and Dim, and leaves Night for Day. From Custom
+    /// it goes to whichever of Day and Dim is farther from the current reading;
+    /// an exact tie goes to Dim unless Dim was the last applied mode.
+    ///
+    /// An `alternate` (Option) click goes to Night, or from Night to Day.
     public static func clickTarget(
         from state: BrightnessState,
         snapshot: HardwareSnapshot,
-        day: BrightnessPreset,
-        night: BrightnessPreset,
-        lastApplied: Mode?
+        presets: Presets,
+        lastApplied: Mode?,
+        alternate: Bool = false
     ) -> Mode {
-        if let mode = state.mode { return mode.opposite }
-        let toDay = distance(snapshot, day)
-        let toNight = distance(snapshot, night)
-        if abs(toDay - toNight) <= 1e-7 {
-            return lastApplied?.opposite ?? .night
+        if alternate { return state == .night ? .day : .night }
+        switch state {
+        case .day:
+            return .dim
+        case .dim, .night:
+            return .day
+        case .custom:
+            let toDay = distance(snapshot, presets.day)
+            let toDim = distance(snapshot, presets.dim)
+            if abs(toDay - toDim) <= 1e-7 {
+                return lastApplied == .dim ? .day : .dim
+            }
+            return toDay < toDim ? .dim : .day
         }
-        return toDay < toNight ? .night : .day
     }
 
     /// Sum of absolute differences across every available channel.

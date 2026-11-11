@@ -1,24 +1,29 @@
-/// One of the two brightness presets.
-public enum Mode: String, Sendable {
+/// One of the three brightness presets, brightest to darkest.
+public enum Mode: String, CaseIterable, Sendable {
     case day
+    case dim
     case night
-
-    public var opposite: Mode { self == .day ? .night : .day }
 }
 
-/// What the hardware currently looks like: one of the presets, or neither.
+/// What the hardware currently looks like: one of the presets, or none of them.
 public enum BrightnessState: Equatable, Sendable {
     case day
+    case dim
     case night
     case custom
 
     public init(_ mode: Mode) {
-        self = mode == .day ? .day : .night
+        switch mode {
+        case .day: self = .day
+        case .dim: self = .dim
+        case .night: self = .night
+        }
     }
 
     public var mode: Mode? {
         switch self {
         case .day: .day
+        case .dim: .dim
         case .night: .night
         case .custom: nil
         }
@@ -36,10 +41,45 @@ public struct BrightnessPreset: Equatable, Sendable {
     }
 
     public static let defaultDay = BrightnessPreset(screen: 1, keyboard: 1)
+    public static let defaultDim = BrightnessPreset(screen: 0.5, keyboard: 0.5)
     public static let defaultNight = BrightnessPreset(screen: 0.2, keyboard: 0.1)
 
     public static func clamp(_ value: Double) -> Double {
         value.isFinite ? min(1, max(0, value)) : 0
+    }
+}
+
+/// The preset for each mode.
+public struct Presets: Equatable, Sendable {
+    public var day: BrightnessPreset
+    public var dim: BrightnessPreset
+    public var night: BrightnessPreset
+
+    public init(
+        day: BrightnessPreset = .defaultDay,
+        dim: BrightnessPreset = .defaultDim,
+        night: BrightnessPreset = .defaultNight
+    ) {
+        self.day = day
+        self.dim = dim
+        self.night = night
+    }
+
+    public subscript(mode: Mode) -> BrightnessPreset {
+        get {
+            switch mode {
+            case .day: day
+            case .dim: dim
+            case .night: night
+            }
+        }
+        set {
+            switch mode {
+            case .day: day = newValue
+            case .dim: dim = newValue
+            case .night: night = newValue
+            }
+        }
     }
 }
 

@@ -6,6 +6,8 @@ public struct SettingsStore {
     enum Key {
         static let dayScreen = "preset.day.screen"
         static let dayKeyboard = "preset.day.keyboard"
+        static let dimScreen = "preset.dim.screen"
+        static let dimKeyboard = "preset.dim.keyboard"
         static let nightScreen = "preset.night.screen"
         static let nightKeyboard = "preset.night.keyboard"
         static let lastApplied = "state.lastAppliedMode"
@@ -19,12 +21,16 @@ public struct SettingsStore {
     }
 
     public func preset(for mode: Mode) -> BrightnessPreset {
-        let fallback = mode == .day ? BrightnessPreset.defaultDay : .defaultNight
+        let fallback = Presets()[mode]
         let keys = Self.keys(for: mode)
         return BrightnessPreset(
             screen: double(keys.screen) ?? fallback.screen,
             keyboard: double(keys.keyboard) ?? fallback.keyboard
         )
+    }
+
+    public var presets: Presets {
+        Presets(day: preset(for: .day), dim: preset(for: .dim), night: preset(for: .night))
     }
 
     public func setPreset(_ preset: BrightnessPreset, for mode: Mode) {
@@ -45,7 +51,11 @@ public struct SettingsStore {
     }
 
     private static func keys(for mode: Mode) -> (screen: String, keyboard: String) {
-        mode == .day ? (Key.dayScreen, Key.dayKeyboard) : (Key.nightScreen, Key.nightKeyboard)
+        switch mode {
+        case .day: (Key.dayScreen, Key.dayKeyboard)
+        case .dim: (Key.dimScreen, Key.dimKeyboard)
+        case .night: (Key.nightScreen, Key.nightKeyboard)
+        }
     }
 
     private func double(_ key: String) -> Double? {

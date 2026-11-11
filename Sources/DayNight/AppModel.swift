@@ -11,8 +11,7 @@ final class AppModel {
     private(set) var state: BrightnessState = .custom
     /// The mode a running fade is heading to.
     private(set) var fadingTo: Mode?
-    private(set) var day: BrightnessPreset
-    private(set) var night: BrightnessPreset
+    private(set) var presets: Presets
     private(set) var displayCount = 0
     private(set) var hasKeyboard = false
     private(set) var controlProblem: String?
@@ -39,8 +38,7 @@ final class AppModel {
     ) {
         settings = SettingsStore(defaults: defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
         hardware = BrightnessController(displays: displays, keyboard: keyboard, defaultsSuite: defaultsSuite)
-        day = settings.preset(for: .day)
-        night = settings.preset(for: .night)
+        presets = settings.presets
         launchAtLogin = LaunchAtLogin(settings: settings, service: loginService)
     }
 
@@ -70,7 +68,7 @@ final class AppModel {
     }
 
     func preset(for mode: Mode) -> BrightnessPreset {
-        mode == .day ? day : night
+        presets[mode]
     }
 
     // MARK: Lifecycle
@@ -112,21 +110,18 @@ final class AppModel {
 
     // MARK: Actions
 
-    /// The primary click: Day ⇄ Night, or from Custom to the farther preset.
-    func toggle() {
+    /// The menu-bar click: Day ⇄ Dim, or to and from Night when `alternate`.
+    /// A click during a fade counts from the fade's destination.
+    func toggle(alternate: Bool = false) {
         guard !isShuttingDown else { return }
         let previous = toggleTask
         toggleTask = Task {
             await previous?.value
-            if let fadingTo {
-                apply(fadingTo.opposite)
-                return
-            }
             let snapshot = await hardware.snapshot()
-            state = infer(snapshot)
+            if fadingTo == nil { state = infer(snapshot) }
             apply(StateEngine.clickTarget(
-                from: state, snapshot: snapshot, day: day, night: night,
-                lastApplied: settings.lastApplied
+                from: displayedState, snapshot: snapshot, presets: presets,
+                lastApplied: settings.lastApplied, alternate: alternate
             ))
         }
     }
@@ -203,7 +198,7 @@ final class AppModel {
     private var isWriting: Bool { fadingTo != nil || previewTask != nil }
 
     private func infer(_ snapshot: HardwareSnapshot) -> BrightnessState {
-        StateEngine.infer(snapshot, day: day, night: night, lastApplied: settings.lastApplied)
+        StateEngine.infer(snapshot, presets: presets, lastApplied: settings.lastApplied)
     }
 
     /// The mode the already-known channels are in, which a newly connected
@@ -216,7 +211,7 @@ final class AppModel {
 
     private func update(_ preset: BrightnessPreset, for mode: Mode) {
         let isLive = StateEngine.shouldPreview(edited: mode, state: state, fadingTo: fadingTo)
-        if mode == .day { day = preset } else { night = preset }
+        presets[mode] = preset
         settings.setPreset(preset, for: mode)
         guard isLive, !isShuttingDown else { return }
         // A live edit writes the whole preset, so the hardware is in `mode`;

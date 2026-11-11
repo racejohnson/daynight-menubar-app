@@ -2,14 +2,15 @@ import AppKit
 import DayNightCore
 import SwiftUI
 
-/// The panel's content: both presets, open at login, and a quiet footer.
+/// The panel's content: the three presets, open at login, and a quiet footer.
 struct PanelView: View {
     let model: AppModel
 
     var body: some View {
         VStack(spacing: 8) {
-            ModeCard(mode: .day, model: model)
-            ModeCard(mode: .night, model: model)
+            ForEach(Mode.allCases, id: \.self) { mode in
+                ModeCard(mode: mode, model: model)
+            }
 
             VStack(spacing: 10) {
                 LaunchAtLoginRow(launchAtLogin: model.launchAtLogin)

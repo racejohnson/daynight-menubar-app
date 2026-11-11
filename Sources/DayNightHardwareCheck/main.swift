@@ -61,6 +61,10 @@ do {
     try require(keyboard.isAutoBrightnessEnabled() == false, "Auto-brightness was not turned off")
     print("Auto-brightness snapshot and disable: PASS")
 
+    let dim = await controller.transition(to: .defaultDim)
+    try verify(await controller.snapshot(), matches: .defaultDim, "Dim")
+    try verifyFade(dim, "Dim")
+
     let night = await controller.transition(to: .defaultNight)
     try verify(await controller.snapshot(), matches: .defaultNight, "Night")
     try verifyFade(night, "Night")
@@ -75,10 +79,10 @@ do {
     try require(displays.setBrightness(0.35, of: manual), "Could not make a manual display change")
     try await Task.sleep(for: .milliseconds(120))
     let custom = await controller.snapshot()
-    let state = StateEngine.infer(custom, day: .defaultDay, night: .defaultNight)
+    let state = StateEngine.infer(custom, presets: Presets())
     try require(state == .custom, "A manual change did not read as Custom")
     let target = StateEngine.clickTarget(
-        from: state, snapshot: custom, day: .defaultDay, night: .defaultNight, lastApplied: .night
+        from: state, snapshot: custom, presets: Presets(), lastApplied: .night
     )
     try require(target == .day, "Custom near Night should click to Day")
     print("Manual change → Custom → next click Day: PASS")

@@ -2,8 +2,8 @@ import AppKit
 import DayNightCore
 import Observation
 
-/// The menu-bar icon. Left-click toggles Day/Night; right-click or
-/// Control-click opens the panel.
+/// The menu-bar icon. Click swaps Day and Dim; Option-click goes to Night;
+/// right-click or Control-click opens the panel.
 @MainActor
 final class StatusItemController: NSObject {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -35,7 +35,7 @@ final class StatusItemController: NSObject {
             panel.toggle(below: sender)
         } else {
             panel.close()
-            model.toggle()
+            model.toggle(alternate: event?.modifierFlags.contains(.option) == true)
         }
     }
 
