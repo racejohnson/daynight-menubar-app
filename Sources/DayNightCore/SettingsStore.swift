@@ -1,13 +1,17 @@
 import Foundation
 
 /// Persistent settings. The keys are shared with DayNight 1.x, so existing
-/// presets and preferences carry over unchanged.
+/// presets and preferences carry over unchanged. Away was first released as
+/// "Dim", so its levels and the last applied mode are also read under that name.
 public struct SettingsStore {
     enum Key {
         static let dayScreen = "preset.day.screen"
         static let dayKeyboard = "preset.day.keyboard"
+        static let awayScreen = "preset.away.screen"
+        static let awayKeyboard = "preset.away.keyboard"
         static let dimScreen = "preset.dim.screen"
         static let dimKeyboard = "preset.dim.keyboard"
+        static let dimMode = "dim"
         static let nightScreen = "preset.night.screen"
         static let nightKeyboard = "preset.night.keyboard"
         static let lastApplied = "state.lastAppliedMode"
@@ -23,14 +27,15 @@ public struct SettingsStore {
     public func preset(for mode: Mode) -> BrightnessPreset {
         let fallback = Presets()[mode]
         let keys = Self.keys(for: mode)
+        let isAway = mode == .away
         return BrightnessPreset(
-            screen: double(keys.screen) ?? fallback.screen,
-            keyboard: double(keys.keyboard) ?? fallback.keyboard
+            screen: double(keys.screen) ?? (isAway ? double(Key.dimScreen) : nil) ?? fallback.screen,
+            keyboard: double(keys.keyboard) ?? (isAway ? double(Key.dimKeyboard) : nil) ?? fallback.keyboard
         )
     }
 
     public var presets: Presets {
-        Presets(day: preset(for: .day), dim: preset(for: .dim), night: preset(for: .night))
+        Presets(day: preset(for: .day), away: preset(for: .away), night: preset(for: .night))
     }
 
     public func setPreset(_ preset: BrightnessPreset, for mode: Mode) {
@@ -40,7 +45,10 @@ public struct SettingsStore {
     }
 
     public var lastApplied: Mode? {
-        get { defaults.string(forKey: Key.lastApplied).flatMap(Mode.init(rawValue:)) }
+        get {
+            let name = defaults.string(forKey: Key.lastApplied)
+            return name == Key.dimMode ? .away : name.flatMap(Mode.init(rawValue:))
+        }
         nonmutating set { defaults.set(newValue?.rawValue, forKey: Key.lastApplied) }
     }
 
@@ -53,7 +61,7 @@ public struct SettingsStore {
     private static func keys(for mode: Mode) -> (screen: String, keyboard: String) {
         switch mode {
         case .day: (Key.dayScreen, Key.dayKeyboard)
-        case .dim: (Key.dimScreen, Key.dimKeyboard)
+        case .away: (Key.awayScreen, Key.awayKeyboard)
         case .night: (Key.nightScreen, Key.nightKeyboard)
         }
     }

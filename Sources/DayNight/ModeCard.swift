@@ -72,7 +72,7 @@ struct ModeCard: View {
 
     private var fill: AnyShapeStyle {
         if isActive {
-            AnyShapeStyle(mode.tint.opacity(colorScheme == .dark ? 0.15 : 0.11))
+            AnyShapeStyle(mode.tint.opacity(mode.fillOpacity(colorScheme)))
         } else {
             AnyShapeStyle(.fill.quaternary)
         }

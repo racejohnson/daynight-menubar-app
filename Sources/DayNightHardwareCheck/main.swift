@@ -61,9 +61,9 @@ do {
     try require(keyboard.isAutoBrightnessEnabled() == false, "Auto-brightness was not turned off")
     print("Auto-brightness snapshot and disable: PASS")
 
-    let dim = await controller.transition(to: .defaultDim)
-    try verify(await controller.snapshot(), matches: .defaultDim, "Dim")
-    try verifyFade(dim, "Dim")
+    let away = await controller.transition(to: .defaultAway)
+    try verify(await controller.snapshot(), matches: .defaultAway, "Away")
+    try verifyFade(away, "Away")
 
     let night = await controller.transition(to: .defaultNight)
     try verify(await controller.snapshot(), matches: .defaultNight, "Night")

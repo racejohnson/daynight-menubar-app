@@ -110,7 +110,7 @@ final class AppModel {
 
     // MARK: Actions
 
-    /// The menu-bar click: Day ⇄ Dim, or to and from Night when `alternate`.
+    /// The menu-bar click: Day ⇄ Away, or to and from Night when `alternate`.
     /// A click during a fade counts from the fade's destination.
     func toggle(alternate: Bool = false) {
         guard !isShuttingDown else { return }

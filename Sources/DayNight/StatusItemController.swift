@@ -2,7 +2,7 @@ import AppKit
 import DayNightCore
 import Observation
 
-/// The menu-bar icon. Click swaps Day and Dim; Option-click goes to Night;
+/// The menu-bar icon. Click swaps Day and Away; Option-click goes to Night;
 /// right-click or Control-click opens the panel.
 @MainActor
 final class StatusItemController: NSObject {

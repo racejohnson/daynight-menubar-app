@@ -29,9 +29,9 @@ public enum StateEngine {
 
     /// The mode a click should apply.
     ///
-    /// A plain click swaps Day and Dim, and leaves Night for Day. From Custom
-    /// it goes to whichever of Day and Dim is farther from the current reading;
-    /// an exact tie goes to Dim unless Dim was the last applied mode.
+    /// A plain click swaps Day and Away, and leaves Night for Day. From Custom
+    /// it goes to whichever of Day and Away is farther from the current reading;
+    /// an exact tie goes to Away unless Away was the last applied mode.
     ///
     /// An `alternate` (Option) click goes to Night, or from Night to Day.
     public static func clickTarget(
@@ -44,16 +44,16 @@ public enum StateEngine {
         if alternate { return state == .night ? .day : .night }
         switch state {
         case .day:
-            return .dim
-        case .dim, .night:
+            return .away
+        case .away, .night:
             return .day
         case .custom:
             let toDay = distance(snapshot, presets.day)
-            let toDim = distance(snapshot, presets.dim)
-            if abs(toDay - toDim) <= 1e-7 {
-                return lastApplied == .dim ? .day : .dim
+            let toAway = distance(snapshot, presets.away)
+            if abs(toDay - toAway) <= 1e-7 {
+                return lastApplied == .away ? .day : .away
             }
-            return toDay < toDim ? .dim : .day
+            return toDay < toAway ? .away : .day
         }
     }
 

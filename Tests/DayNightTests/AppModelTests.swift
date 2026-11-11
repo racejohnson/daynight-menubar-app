@@ -32,14 +32,14 @@ struct AppModelTests {
         }
     }
 
-    @Test func clickSwapsDayAndDim() async {
+    @Test func clickSwapsDayAndAway() async {
         let displays = MockDisplays([1: 1, 2: 1])
         let keyboard = MockKeyboard(1)
         let model = await model(displays, keyboard)
 
         model.toggle()
-        await waitUntil { lastApplied == "dim" && model.fadingTo == nil }
-        #expect(model.state == .dim)
+        await waitUntil { lastApplied == "away" && model.fadingTo == nil }
+        #expect(model.state == .away)
         #expect(displays.values == [1: 0.5, 2: 0.5])
 
         model.toggle()

@@ -11,8 +11,8 @@ struct StateEngineTests {
         let outside = HardwareSnapshot(displays: [1: 0.979, 2: 1], keyboard: 1)
         #expect(StateEngine.infer(outside, presets: presets) == .custom)
 
-        let nearDim = HardwareSnapshot(displays: [1: 0.5, 2: 0.519], keyboard: 0.481)
-        #expect(StateEngine.infer(nearDim, presets: presets) == .dim)
+        let nearAway = HardwareSnapshot(displays: [1: 0.5, 2: 0.519], keyboard: 0.481)
+        #expect(StateEngine.infer(nearAway, presets: presets) == .away)
 
         let nearNight = HardwareSnapshot(displays: [1: 0.2, 2: 0.219], keyboard: 0.081)
         #expect(StateEngine.infer(nearNight, presets: presets) == .night)
@@ -29,16 +29,16 @@ struct StateEngineTests {
 
     @Test func matchingSeveralPresetsResolvesToLastAppliedOrTheBrightest() {
         let same = BrightnessPreset(screen: 0.5, keyboard: 0.5)
-        let all = Presets(day: same, dim: same, night: same)
+        let all = Presets(day: same, away: same, night: same)
         let reading = HardwareSnapshot(displays: [1: 0.5], keyboard: 0.5)
         #expect(StateEngine.infer(reading, presets: all) == .day)
         #expect(StateEngine.infer(reading, presets: all, lastApplied: .night) == .night)
-        #expect(StateEngine.infer(reading, presets: all, lastApplied: .dim) == .dim)
+        #expect(StateEngine.infer(reading, presets: all, lastApplied: .away) == .away)
 
-        let dimAndNight = Presets(dim: same, night: same)
-        #expect(StateEngine.infer(reading, presets: dimAndNight) == .dim)
-        #expect(StateEngine.infer(reading, presets: dimAndNight, lastApplied: .day) == .dim)
-        #expect(StateEngine.infer(reading, presets: dimAndNight, lastApplied: .night) == .night)
+        let awayAndNight = Presets(away: same, night: same)
+        #expect(StateEngine.infer(reading, presets: awayAndNight) == .away)
+        #expect(StateEngine.infer(reading, presets: awayAndNight, lastApplied: .day) == .away)
+        #expect(StateEngine.infer(reading, presets: awayAndNight, lastApplied: .night) == .night)
     }
 
     func click(_ state: BrightnessState, _ reading: HardwareSnapshot, last: Mode? = nil, alternate: Bool = false) -> Mode {
@@ -47,38 +47,38 @@ struct StateEngineTests {
         )
     }
 
-    @Test func clickSwapsDayAndDimAndLeavesNightForDay() {
+    @Test func clickSwapsDayAndAwayAndLeavesNightForDay() {
         let reading = HardwareSnapshot(displays: [1: 1], keyboard: 1)
-        #expect(click(.day, reading) == .dim)
-        #expect(click(.dim, reading) == .day)
+        #expect(click(.day, reading) == .away)
+        #expect(click(.away, reading) == .day)
         #expect(click(.night, reading, last: .night) == .day)
     }
 
     @Test func optionClickGoesToNightOrFromNightToDay() {
         let reading = HardwareSnapshot(displays: [1: 1], keyboard: 1)
         #expect(click(.day, reading, alternate: true) == .night)
-        #expect(click(.dim, reading, alternate: true) == .night)
+        #expect(click(.away, reading, alternate: true) == .night)
         #expect(click(.custom, reading, alternate: true) == .night)
         #expect(click(.night, reading, alternate: true) == .day)
     }
 
-    @Test func clickFromCustomGoesToTheFartherOfDayAndDim() {
+    @Test func clickFromCustomGoesToTheFartherOfDayAndAway() {
         let nearNight = HardwareSnapshot(displays: [1: 0.25, 2: 0.2], keyboard: 0.12)
         #expect(click(.custom, nearNight, last: .night) == .day)
 
-        let nearDim = HardwareSnapshot(displays: [1: 0.45, 2: 0.6], keyboard: 0.5)
-        #expect(click(.custom, nearDim, last: .dim) == .day)
+        let nearAway = HardwareSnapshot(displays: [1: 0.45, 2: 0.6], keyboard: 0.5)
+        #expect(click(.custom, nearAway, last: .away) == .day)
 
         let nearDay = HardwareSnapshot(displays: [1: 0.9, 2: 1], keyboard: 0.95)
-        #expect(click(.custom, nearDay, last: .day) == .dim)
+        #expect(click(.custom, nearDay, last: .day) == .away)
     }
 
-    @Test func clickFromAnExactTieGoesToDimUnlessDimWasLast() {
+    @Test func clickFromAnExactTieGoesToAwayUnlessAwayWasLast() {
         let tie = HardwareSnapshot(displays: [1: 0.75], keyboard: 0.75)
-        #expect(click(.custom, tie) == .dim)
-        #expect(click(.custom, tie, last: .day) == .dim)
-        #expect(click(.custom, tie, last: .night) == .dim)
-        #expect(click(.custom, tie, last: .dim) == .day)
+        #expect(click(.custom, tie) == .away)
+        #expect(click(.custom, tie, last: .day) == .away)
+        #expect(click(.custom, tie, last: .night) == .away)
+        #expect(click(.custom, tie, last: .away) == .day)
     }
 
     @Test func livePreviewOnlyForTheActiveOrIncomingMode() {
@@ -86,8 +86,8 @@ struct StateEngineTests {
         #expect(StateEngine.shouldPreview(edited: .night, state: .custom, fadingTo: .night))
         #expect(!StateEngine.shouldPreview(edited: .night, state: .custom, fadingTo: nil))
         #expect(!StateEngine.shouldPreview(edited: .day, state: .night, fadingTo: nil))
-        #expect(StateEngine.shouldPreview(edited: .dim, state: .dim, fadingTo: nil))
-        #expect(!StateEngine.shouldPreview(edited: .dim, state: .day, fadingTo: .night))
+        #expect(StateEngine.shouldPreview(edited: .away, state: .away, fadingTo: nil))
+        #expect(!StateEngine.shouldPreview(edited: .away, state: .day, fadingTo: .night))
     }
 
     @Test func smoothstepEasing() {

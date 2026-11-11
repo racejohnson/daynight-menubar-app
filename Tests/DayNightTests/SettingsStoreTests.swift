@@ -6,7 +6,7 @@ struct SettingsStoreTests {
         let isolated = IsolatedDefaults()
         let store = SettingsStore(defaults: isolated.defaults)
         #expect(store.preset(for: .day) == .defaultDay)
-        #expect(store.preset(for: .dim) == .defaultDim)
+        #expect(store.preset(for: .away) == .defaultAway)
         #expect(store.preset(for: .night) == .defaultNight)
         #expect(store.presets == Presets())
         #expect(store.lastApplied == nil)
@@ -26,9 +26,24 @@ struct SettingsStoreTests {
         let store = SettingsStore(defaults: defaults)
         #expect(store.preset(for: .day) == BrightnessPreset(screen: 0.85, keyboard: 0.6))
         #expect(store.preset(for: .night) == BrightnessPreset(screen: 0.01, keyboard: 0.01))
-        #expect(store.preset(for: .dim) == .defaultDim, "Dim is new, so it starts at its default")
+        #expect(store.preset(for: .away) == .defaultAway, "Away came later, so it starts at its default")
         #expect(store.lastApplied == .night)
         #expect(!store.launchAtLogin)
+    }
+
+    @Test func levelsSavedAsDimCarryOverToAway() {
+        let isolated = IsolatedDefaults()
+        let defaults = isolated.defaults
+        defaults.set(0.4, forKey: "preset.dim.screen")
+        defaults.set(0.25, forKey: "preset.dim.keyboard")
+        defaults.set("dim", forKey: "state.lastAppliedMode")
+
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.preset(for: .away) == BrightnessPreset(screen: 0.4, keyboard: 0.25))
+        #expect(store.lastApplied == .away)
+
+        store.setPreset(BrightnessPreset(screen: 0.6, keyboard: 0.25), for: .away)
+        #expect(store.preset(for: .away) == BrightnessPreset(screen: 0.6, keyboard: 0.25), "new levels win")
     }
 
     @Test func legacyValuesAreClampedAndCustomIsIgnored() {
@@ -45,22 +60,22 @@ struct SettingsStoreTests {
         let isolated = IsolatedDefaults()
         let store = SettingsStore(defaults: isolated.defaults)
         store.setPreset(BrightnessPreset(screen: 0.33, keyboard: 0.44), for: .night)
-        store.setPreset(BrightnessPreset(screen: 0.55, keyboard: 0.35), for: .dim)
-        store.lastApplied = .dim
-        #expect(isolated.defaults.string(forKey: "state.lastAppliedMode") == "dim")
+        store.setPreset(BrightnessPreset(screen: 0.55, keyboard: 0.35), for: .away)
+        store.lastApplied = .away
+        #expect(isolated.defaults.string(forKey: "state.lastAppliedMode") == "away")
         store.lastApplied = .day
         store.launchAtLogin = false
 
         #expect(isolated.defaults.double(forKey: "preset.night.screen") == 0.33)
         #expect(isolated.defaults.double(forKey: "preset.night.keyboard") == 0.44)
-        #expect(isolated.defaults.double(forKey: "preset.dim.screen") == 0.55)
-        #expect(isolated.defaults.double(forKey: "preset.dim.keyboard") == 0.35)
+        #expect(isolated.defaults.double(forKey: "preset.away.screen") == 0.55)
+        #expect(isolated.defaults.double(forKey: "preset.away.keyboard") == 0.35)
         #expect(isolated.defaults.string(forKey: "state.lastAppliedMode") == "day")
         #expect(isolated.defaults.object(forKey: "login.desired") as? Bool == false)
 
         let reloaded = SettingsStore(defaults: isolated.defaults)
         #expect(reloaded.preset(for: .night) == BrightnessPreset(screen: 0.33, keyboard: 0.44))
-        #expect(reloaded.preset(for: .dim) == BrightnessPreset(screen: 0.55, keyboard: 0.35))
+        #expect(reloaded.preset(for: .away) == BrightnessPreset(screen: 0.55, keyboard: 0.35))
         reloaded.lastApplied = nil
         #expect(SettingsStore(defaults: isolated.defaults).lastApplied == nil)
     }
