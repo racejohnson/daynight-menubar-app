@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds AppResources/Assets.car and AppResources/AppIcon.icns from the two drawings in this folder.
 #
-#   AppIcon.svg        the 1024 master, used from 64 px up (its light leak only from 256 up)
+#   AppIcon.svg        the 1024 master, used from 64 px up
 #   AppIcon-small.svg  the flat pixel drawing on a 32 grid, used at 16 and 32
 #
 # Renders with Playwright's Chromium when it can find it (PLAYWRIGHT=/path/to/playwright/index.mjs),
@@ -28,7 +28,6 @@ mkdir -p "$SET"
 sed -e '/transform="translate(0,12)"/d' -e 's|<g clip-path="url(#tile)">|<g>|' \
     -e 's|viewBox="0 0 1024 1024"|viewBox="100 100 824 824"|' "$HERE/AppIcon.svg" > "$TMP/bleed.svg"
 cp "$HERE/AppIcon.svg" "$TMP/full.svg"
-sed '/<!-- leak:begin/,/<!-- leak:end -->/d' "$HERE/AppIcon.svg" > "$TMP/lite.svg"
 grep -v 'data-max="16"' "$HERE/AppIcon-small.svg" > "$TMP/small32.svg"
 grep -v 'data-min="32"' "$HERE/AppIcon-small.svg" > "$TMP/small16.svg"
 
@@ -37,8 +36,8 @@ JOBS=(
   "icon_16x16.png       small16 16"
   "icon_16x16@2x.png    small32 32"
   "icon_32x32.png       small32 32"
-  "icon_32x32@2x.png    lite    64"
-  "icon_128x128.png     lite    128"
+  "icon_32x32@2x.png    full    64"
+  "icon_128x128.png     full    128"
   "icon_128x128@2x.png  full    256"
   "icon_256x256.png     full    256"
   "icon_256x256@2x.png  full    512"

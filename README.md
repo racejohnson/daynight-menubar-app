@@ -103,7 +103,7 @@ make run              # build a copy in .build and open it
 make test             # run the tests
 make hardware-check   # try Day, Away and Night on your real screens, then restore them (needs a second Apple display)
 make selftest         # click the real item and panel with synthetic clicks, on made-up screens
-make readme           # redraw this page's pictures from the same made-up screens
+make readme           # redraw this page's pictures from the same made-up screens (needs rsvg-convert)
 ```
 
 Builds are signed ad hoc. **Open at Login** only works for the copy in Applications, so use `make install` to try it. Only one copy runs at a time, so `make run` quits the installed one first.

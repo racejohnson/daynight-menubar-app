@@ -22,8 +22,8 @@ extension Mode {
     /// The fill of the row that is on, under white text. Day is the app icon's
     /// sun, deeper than system orange so the text reads (white is at least
     /// 3.4:1 on it in both appearances). Away is a purple, between the
-    /// two. Night is the icon's night sky in light mode, and the lighter blue
-    /// of its glow in dark mode, where the sky colour would vanish.
+    /// two. Night is the icon's night sky in light mode, and a lighter blue
+    /// in dark mode, where the sky colour would vanish.
     var tint: Color {
         switch self {
         case .day: Color(light: (224, 94, 38), dark: (226, 100, 48))

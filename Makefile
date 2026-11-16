@@ -52,9 +52,10 @@ selftest: app
 	"$(APP)/Contents/MacOS/DayNight" --selftest
 
 # Redraws the README's pictures in docs from the same made-up Mac, so they
-# come out the same on any machine.
+# come out the same on any machine. Needs rsvg-convert for the app icon.
 readme: app
 	"$(APP)/Contents/MacOS/DayNight" --readme docs
+	rsvg-convert -w 256 -h 256 Icon/AppIcon.svg -o docs/icon.png
 
 clean:
 	$(SWIFT) package clean
