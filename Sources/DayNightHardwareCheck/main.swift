@@ -34,8 +34,11 @@ func verifyFade(_ report: TransitionReport, _ label: String) throws {
 
 let displays = SystemDisplays()
 let keyboard = SystemKeyboard()
-let suite = "DayNightHardwareCheck.\(UUID().uuidString)"
+// A fixed name, so a run that was interrupted is put right by the next one:
+// its marker for keyboard auto-brightness is found here and restored first.
+let suite = "com.racejohnson.DayNight.hardware-check"
 let controller = BrightnessController(displays: displays, keyboard: keyboard, defaultsSuite: suite)
+_ = await controller.recoverLeftoverAutoBrightness()
 
 let baseline = await controller.snapshot()
 let baselineAuto = keyboard.isAutoBrightnessEnabled()

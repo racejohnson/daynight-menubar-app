@@ -20,12 +20,13 @@ extension Mode {
     }
 
     /// The fill of the row that is on, under white text. Day is the app icon's
-    /// sun, deeper than system orange so the text reads. Night is the icon's
-    /// night sky in light mode, and the lighter blue of its glow in dark mode,
-    /// where the sky colour would vanish.
+    /// sun, deeper than system orange so the text reads (white is at least
+    /// 3.4:1 on it in both appearances). Away is a purple, between the
+    /// two. Night is the icon's night sky in light mode, and the lighter blue
+    /// of its glow in dark mode, where the sky colour would vanish.
     var tint: Color {
         switch self {
-        case .day: Color(light: (224, 94, 38), dark: (238, 116, 69))
+        case .day: Color(light: (224, 94, 38), dark: (226, 100, 48))
         case .away: Color(light: (140, 78, 181), dark: (173, 106, 219))
         case .night: Color(light: (42, 50, 111), dark: (74, 86, 184))
         }
@@ -43,5 +44,7 @@ private extension Color {
 }
 
 extension BrightnessState {
-    var title: String { mode?.title ?? "Custom" }
+    /// "No mode" is what the panel and the README call the brightness
+    /// matching none of the three.
+    var title: String { mode?.title ?? "No mode" }
 }

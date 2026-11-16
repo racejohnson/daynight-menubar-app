@@ -16,6 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Two copies would both set the brightness and each draw a capsule.
+        // The self-test's made-up Mac changes nothing, so it may run beside the real app.
+        if demo == nil, let bundleID = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).contains(where: { $0 != .current }) {
+            hasRepliedToTerminate = true
+            exit(0)
+        }
         let panel = PanelController(model: model)
         let statusItem = StatusItemController(model: model, panel: panel)
         self.statusItem = statusItem

@@ -17,11 +17,11 @@ struct PanelView: View {
             }
             .padding(.bottom, 6)
 
-            Heading(
-                title: "Mode",
-                hint: model.displayedState.mode.map { "the sliders set \($0.title)" } ?? "matches none"
-            )
             VStack(spacing: 1) {
+                Heading(
+                    title: "Mode",
+                    hint: model.displayedState.mode.map { "the sliders set \($0.title)" } ?? "the sliders set no mode"
+                )
                 ForEach(Mode.allCases, id: \.self) { mode in
                     ModeRow(mode: mode, model: model)
                 }
@@ -87,6 +87,7 @@ private struct Heading: View {
         .padding(.top, 2)
         .padding(.bottom, 3)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -185,14 +186,19 @@ private struct LevelSlider: View {
 
     private var value: Double { channel == .screens ? model.levels.screen : model.levels.keyboard }
     private var canSet: Bool { channel == .screens ? model.canSetScreen : model.canSetKeyboard }
-    /// The hardware this slider sets is not there. With a mode on, the level
-    /// is still kept for when it is.
-    private var isAway: Bool { channel == .screens ? model.displayCount == 0 : !model.hasKeyboard }
+    /// The hardware this slider sets is missing. With a mode on, the level is
+    /// still kept for when it is back.
+    private var isMissing: Bool { channel == .screens ? model.displayCount == 0 : !model.hasKeyboard }
     private var title: String { channel == .screens ? "Screens" : "Keyboard" }
-    private var spoken: String { channel == .screens ? "Screen brightness" : "Keyboard brightness" }
+
+    /// What a change does, for VoiceOver: the heading says it, but comes after the sliders.
+    private var spokenHint: String {
+        let effect = model.displayedState.mode.map { "Sets \($0.title)’s level." } ?? "Sets the brightness. No mode changes."
+        return note.isEmpty ? effect : "\(effect) \(note)"
+    }
 
     private var note: String {
-        guard isAway else { return "" }
+        guard isMissing else { return "" }
         let missing = channel == .screens ? "No display DayNight can set is connected." : "No keyboard backlight is connected."
         return canSet ? "\(missing) The level is saved for later." : missing
     }
@@ -207,16 +213,16 @@ private struct LevelSlider: View {
                 // the edge, so the text stays readable across it and neither
                 // copy shows through the other.
                 label
-                    .foregroundStyle(isAway ? .secondary : .primary)
+                    .foregroundStyle(isMissing ? .secondary : .primary)
                     .mask(alignment: .trailing) { Rectangle().frame(width: max(geometry.size.width - width, 0)) }
                 // White in both appearances, as in Control Center. A plain
                 // colour, because `.primary` goes grey on glass. Grey when the
-                // hardware is away and the level is only being kept.
+                // hardware is missing and the level is only being kept.
                 Rectangle()
-                    .fill(isAway ? AnyShapeStyle(.primary.opacity(0.11)) : AnyShapeStyle(Color.white.opacity(0.92)))
+                    .fill(isMissing ? AnyShapeStyle(.primary.opacity(0.11)) : AnyShapeStyle(Color.white.opacity(0.92)))
                     .frame(width: width)
                 label
-                    .foregroundStyle(isAway ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.black))
+                    .foregroundStyle(isMissing ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.black))
                     .mask(alignment: .leading) { Rectangle().frame(width: width) }
             }
             .clipShape(Capsule())
@@ -245,16 +251,18 @@ private struct LevelSlider: View {
             return .handled
         }
         .accessibilityRepresentation {
+            // Each change is a whole edit, as an arrow key is: VoiceOver's
+            // steps come without a start and an end.
             Slider(
-                value: Binding(get: { value }, set: { set($0) }), in: 0...1, step: 1.0 / 16,
-                label: { Text(spoken) },
-                onEditingChanged: { isEditing in
-                    if !isEditing { model.endLevelEdit() }
-                }
-            )
+                value: Binding(get: { value }, set: { level in
+                    set(level)
+                    model.endLevelEdit()
+                }),
+                in: 0...1, step: 1.0 / 16
+            ) { Text(title) }
             .disabled(!canSet)
             .accessibilityValue("\(Int((value * 100).rounded())) percent")
-            .accessibilityHint(note)
+            .accessibilityHint(canSet ? spokenHint : note)
         }
         .help(note)
     }
@@ -268,20 +276,37 @@ private struct LevelSlider: View {
             Image(systemName: channel == .screens ? "display" : "keyboard")
                 .symbolRenderingMode(.monochrome)
                 .font(.system(size: 12, weight: .medium))
-                .frame(width: 24)
+                // As wide as a row's badge, so the glyphs and the names line up down the panel.
+                .frame(width: 26)
             Text(title)
                 .font(.system(size: 11.5, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 4)
             if canSet {
-                Text(value, format: .percent.precision(.fractionLength(0)))
+                Percent(level: value)
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .opacity(0.6)
             }
         }
+        // The right edge lines up with the heading's hint and Quit.
         .padding(.leading, 8)
-        .padding(.trailing, 11)
+        .padding(.trailing, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// A percentage that counts along with the fill beside it when a mode
+/// change glides, where plain text would jump to the new number at once.
+private struct Percent: View, Animatable {
+    var level: Double
+
+    nonisolated var animatableData: Double {
+        get { level }
+        set { level = newValue }
+    }
+
+    var body: some View {
+        Text(level, format: .percent.precision(.fractionLength(0)))
     }
 }
 

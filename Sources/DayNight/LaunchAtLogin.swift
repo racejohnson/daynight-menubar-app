@@ -74,7 +74,7 @@ final class LaunchAtLogin {
         case .enabled: issue = nil
         case .requiresApproval: issue = .needsApproval
         case .notFound: issue = .notInApplications
-        default: issue = .failed("Not registered.")
+        default: issue = .failed("Not added to Login Items. Turn this off and on again.")
         }
     }
 

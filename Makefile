@@ -35,7 +35,10 @@ install: app
 	/usr/bin/codesign --verify --deep --strict --verbose=2 "$(INSTALLED)"
 	/usr/bin/open "$(INSTALLED)"
 
+# Quits the installed copy first: the app will not run beside another copy of itself.
 run: app
+	-/usr/bin/osascript -e 'if application id "com.racejohnson.DayNight" is running then tell application id "com.racejohnson.DayNight" to quit'
+	-@for i in $$(seq 1 50); do /usr/bin/pgrep -xq DayNight || break; /bin/sleep 0.1; done
 	/usr/bin/open "$(APP)"
 
 hardware-check:
@@ -44,7 +47,7 @@ hardware-check:
 
 # Puts the real item in the menu bar and opens the real panel, on made-up
 # displays and a made-up keyboard, and drives them with synthetic clicks. The
-# real brightness and settings are not touched. Keep your hands off for ten seconds.
+# real brightness and settings are not touched. Keep your hands off for fifteen seconds.
 selftest: app
 	"$(APP)/Contents/MacOS/DayNight" --selftest
 

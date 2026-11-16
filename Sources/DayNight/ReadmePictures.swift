@@ -19,18 +19,23 @@ enum ReadmePictures {
             let demo = Demo()
             let presets = demo.model.presets
             var shots: [Shot] = []
+            var written = true
             for (mode, dark) in [(Mode.day, false), (.away, false), (.night, true)] {
                 await demo.show(presets[mode])
                 guard let rep = render(demo.model, dark: dark), let image = rep.cgImage else { continue }
                 shots.append(Shot(panel: image, size: rep.size, item: Glyphs.trio(demo.model.displayedState), isDark: dark))
-                save(chip(Glyphs.trio(demo.model.displayedState)), to: folder.appendingPathComponent("icon-\(mode.rawValue).png"))
+                written = save(chip(Glyphs.trio(demo.model.displayedState)), to: folder.appendingPathComponent("icon-\(mode.rawValue).png")) && written
             }
             // The brightness keys have been used: no mode matches.
             await demo.show(BrightnessPreset(screen: 0.72, keyboard: 0.35))
-            save(chip(Glyphs.trio(demo.model.displayedState)), to: folder.appendingPathComponent("icon-custom.png"))
+            written = save(chip(Glyphs.trio(demo.model.displayedState)), to: folder.appendingPathComponent("icon-custom.png")) && written
 
-            save(hero(shots), to: folder.appendingPathComponent("panel.png"))
+            written = save(hero(shots), to: folder.appendingPathComponent("panel.png")) && written
             Demo.cleanUp()
+            guard written, shots.count == 3 else {
+                FileHandle.standardError.write(Data("readme: could not draw or write every picture in \(folder.path)\n".utf8))
+                exit(1)
+            }
             print("Wrote the README's pictures to \(folder.path)")
             exit(0)
         }
@@ -136,8 +141,10 @@ enum ReadmePictures {
         context.setBlendMode(.normal)
     }
 
-    private static func save(_ image: NSImage, to url: URL) {
-        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return }
-        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+    /// Whether the picture was written.
+    private static func save(_ image: NSImage, to url: URL) -> Bool {
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? png.write(to: url)) != nil
     }
 }

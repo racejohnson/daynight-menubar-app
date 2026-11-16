@@ -27,6 +27,9 @@ final class AppModel {
     @ObservationIgnored private let hardware: BrightnessController
     @ObservationIgnored private var transitionID = 0
     @ObservationIgnored private var isRefreshing = false
+    /// False until the hardware has been read once, so nothing is concluded from the counts before then.
+    @ObservationIgnored private var hasRead = false
+    @ObservationIgnored private var isPanelOpen = false
     @ObservationIgnored private var isShuttingDown = false
     @ObservationIgnored private var toggleTask: Task<Void, Never>?
     @ObservationIgnored private var pendingPreview: Write?
@@ -59,14 +62,21 @@ final class AppModel {
 
     var hardwareSummary: String {
         let displays = switch displayCount {
-        case 0: "No displays"
+        case 0: "no displays"
         case 1: "1 display"
         default: "\(displayCount) displays"
         }
-        return "\(displays) · \(hasKeyboard ? "Keyboard" : "No keyboard")"
+        // The keyboard's backlight, not the keyboard: every Mac has one of those.
+        return "\(displays) · \(hasKeyboard ? "keyboard light" : "no keyboard light")"
     }
 
+    /// Nothing here can be set: no built-in or Apple display, and no keyboard backlight.
+    private var hasNothingToSet: Bool { hasRead && displayCount == 0 && !hasKeyboard }
+
     var problem: String? {
+        if hasNothingToSet {
+            return "DayNight can’t set the brightness of these screens. It works with built-in and Apple displays."
+        }
         if let controlProblem { return controlProblem }
         return switch leftoverRecovery {
         case .keyboardUnavailable: "Keyboard auto-brightness will be restored when the keyboard is back."
@@ -86,8 +96,8 @@ final class AppModel {
         return customLevels ?? BrightnessPreset(screen: reading.averageScreen ?? 0, keyboard: reading.keyboard ?? 0)
     }
 
-    /// With a mode on, a slider sets that mode even when its hardware is away.
-    /// With none on, there has to be something to set.
+    /// With a mode on, a slider sets that mode even when its hardware is
+    /// missing. With none on, there has to be something to set.
     var canSetScreen: Bool { displayedState.mode != nil || displayCount > 0 }
     var canSetKeyboard: Bool { displayedState.mode != nil || hasKeyboard }
 
@@ -102,10 +112,22 @@ final class AppModel {
         observe(NSApplication.didChangeScreenParametersNotification, on: .default)
         observe(NSWorkspace.didWakeNotification, on: NSWorkspace.shared.notificationCenter)
         observe(NSWorkspace.screensDidWakeNotification, on: NSWorkspace.shared.notificationCenter)
-        // A light poll keeps the icon honest after brightness-key changes.
+        startPolling()
+    }
+
+    /// A light poll keeps the item honest after brightness-key changes. While
+    /// the panel is open it runs faster, so the sliders follow the keys.
+    private func startPolling() {
+        pollTask?.cancel()
+        let isFast = isPanelOpen
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2), tolerance: .seconds(1))
+                if isFast {
+                    try? await Task.sleep(for: .milliseconds(300), tolerance: .milliseconds(100))
+                } else {
+                    try? await Task.sleep(for: .seconds(2), tolerance: .seconds(1))
+                }
+                guard !Task.isCancelled else { return }
                 await self?.refresh()
             }
         }
@@ -125,7 +147,17 @@ final class AppModel {
 
     func panelDidOpen() {
         launchAtLogin.refresh()
+        isPanelOpen = true
         Task { await refresh() }
+        if pollTask != nil { startPolling() }
+    }
+
+    /// The panel can close in the middle of a drag (Esc, another app, a
+    /// display change), and the slider then never hears that the drag ended.
+    func panelDidClose() {
+        isPanelOpen = false
+        endLevelEdit()
+        if pollTask != nil { startPolling() }
     }
 
     // MARK: Actions
@@ -138,6 +170,9 @@ final class AppModel {
         toggleTask = Task {
             await previous?.value
             let snapshot = await hardware.snapshot()
+            // With nothing to set, a click would light a mode for the length
+            // of a fade that changes nothing.
+            guard snapshot.channelCount > 0 else { return }
             if fadingTo == nil { state = infer(snapshot) }
             apply(StateEngine.clickTarget(
                 from: displayedState, snapshot: snapshot, presets: presets,
@@ -148,7 +183,7 @@ final class AppModel {
 
     /// Fades every display and the keyboard to `mode`.
     func apply(_ mode: Mode) {
-        guard !isShuttingDown else { return }
+        guard !isShuttingDown, !hasNothingToSet else { return }
         transitionID += 1
         let id = transitionID
         pendingPreview = nil
@@ -165,18 +200,6 @@ final class AppModel {
             fadingTo = nil
             await refresh()
         }
-    }
-
-    func setScreen(_ value: Double, for mode: Mode) {
-        var preset = preset(for: mode)
-        preset.screen = value
-        update(preset, for: mode)
-    }
-
-    func setKeyboard(_ value: Double, for mode: Mode) {
-        var preset = preset(for: mode)
-        preset.keyboard = value
-        update(preset, for: mode)
     }
 
     /// The panel's Screens slider: sets the mode that is on, or with none on
@@ -203,6 +226,8 @@ final class AppModel {
             guard id == editID else { return }
             editTarget = nil
             await refresh()
+            // A drag that began during that read owns the levels now.
+            guard id == editID else { return }
             customLevels = nil
         }
     }
@@ -219,6 +244,7 @@ final class AppModel {
         defer { isRefreshing = false }
 
         let reading = await hardware.read()
+        hasRead = true
         var snapshot = reading.snapshot
         let keyboardAppeared = snapshot.keyboard != nil && !hasKeyboard
         displayCount = snapshot.displays.count
@@ -265,8 +291,9 @@ final class AppModel {
         presets[mode] = preset
         settings.setPreset(preset, for: mode)
         guard isLive, !isShuttingDown else { return }
-        // A live edit writes the whole preset, so the hardware is in `mode`;
-        // it also supersedes any fade still running.
+        // A live edit writes the whole preset, on purpose: a drag on Screens
+        // also asserts the mode's keyboard level, so the hardware is in `mode`.
+        // It also supersedes any fade still running.
         transitionID += 1
         fadingTo = nil
         state = BrightnessState(mode)

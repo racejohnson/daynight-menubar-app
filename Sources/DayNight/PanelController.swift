@@ -48,6 +48,17 @@ final class PanelController {
         }
     }
 
+    /// For a plain click on the status item: closes the panel if it is open,
+    /// and says whether this click was a dismissal. That includes a click the
+    /// outside-click monitor has just closed the panel for (see `toggle`).
+    func dismiss() -> Bool {
+        if isVisible {
+            close()
+            return true
+        }
+        return ProcessInfo.processInfo.systemUptime - closedAt <= 0.25
+    }
+
     func show(below button: NSStatusBarButton) {
         guard let window = button.window, let screen = window.screen else { return }
         anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
@@ -75,6 +86,7 @@ final class PanelController {
         stopMonitoring()
         panel.orderOut(nil)
         closedAt = ProcessInfo.processInfo.systemUptime
+        model.panelDidClose()
         onVisibilityChange?(false)
     }
 

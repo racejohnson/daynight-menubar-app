@@ -4,8 +4,9 @@ import DayNightCore
 /// `--selftest`: puts the real item in the menu bar and opens the real panel,
 /// on a made-up Mac, and drives them with synthetic mouse events the way a
 /// hand would. It checks the parts unit tests cannot reach: that clicks on
-/// the item swap modes and open the panel, that a click on a row fades to it,
-/// and that the sliders follow the pointer. The real brightness is never touched.
+/// the item swap modes and open and close the panel, that a click on a row
+/// fades to it, and that the sliders follow the pointer. The real brightness
+/// is never touched.
 @MainActor
 enum SelfTest {
     static func run(demo: Demo, panel: PanelController, button: NSStatusBarButton) {
@@ -15,6 +16,7 @@ enum SelfTest {
             try? await Task.sleep(for: .milliseconds(1200))
             guard let bar = button.window else {
                 print("selftest: FAIL · the item has no window")
+                Demo.cleanUp()
                 exit(1)
             }
             var failures = 0
@@ -47,18 +49,32 @@ enum SelfTest {
             await settle()
             check("click from Night", model.state == .day, model.state.title)
 
-            // 2. Right-click opens the panel, and a second one closes it.
+            // 2. Right-click opens the panel and a second one closes it, as does
+            // a plain click, which then leaves the mode alone. Control-click opens it too.
+            @MainActor func open() -> String { panel.isVisible ? "open" : "closed" }
             await click(bar, at, right: true)
             try? await Task.sleep(for: .milliseconds(500))
-            check("right-click opens the panel", panel.isVisible, panel.isVisible ? "open" : "closed")
+            check("right-click opens the panel", panel.isVisible, open())
+            await click(bar, at, right: true)
+            try? await Task.sleep(for: .milliseconds(500))
+            check("a second right-click closes it", !panel.isVisible, open())
+            await click(bar, at, modifiers: .control)
+            try? await Task.sleep(for: .milliseconds(500))
+            check("Control-click opens the panel", panel.isVisible, open())
+            await click(bar, at)
+            await settle()
+            check("a click with the panel open only closes it", !panel.isVisible && model.state == .day, "\(open()), \(model.state.title)")
+            await click(bar, at, right: true)
+            try? await Task.sleep(for: .milliseconds(500))
             guard let window = NSApp.windows.first(where: { $0.isVisible && $0 !== bar && $0 is NSPanel }) else {
                 print("selftest: FAIL · the panel did not stay open (a click in another app closes it). Run it again and keep your hands off.")
+                Demo.cleanUp()
                 exit(1)
             }
             check("panel size", window.frame.width == 312, "\(Int(window.frame.width)) × \(Int(window.frame.height)) pt")
 
-            // From the top of the panel: 10 pt padding, two 30 pt sliders 8 pt
-            // apart, 6 pt, the heading, then 38 pt rows 1 pt apart.
+            // From the top of the panel, as PanelView lays it out: 10 pt padding,
+            // two 30 pt sliders 8 pt apart, 6 pt, the heading, then 38 pt rows 1 pt apart.
             @MainActor func fromTop(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: x, y: window.frame.height - y) }
             let sliderLeft: CGFloat = 10, sliderWidth: CGFloat = 292
             let screens: CGFloat = 25, keyboard: CGFloat = 63
@@ -79,7 +95,7 @@ enum SelfTest {
 
             // 5. With no mode on, a slider sets the brightness and no mode.
             await demo.show(BrightnessPreset(screen: 0.72, keyboard: 0.35))
-            check("brightness keys", model.state == .custom, model.state.title)
+            check("brightness keys leave every mode", model.state == .custom, model.state.title)
             let before = model.presets
             await click(window, fromTop(sliderLeft + sliderWidth * 0.6, keyboard))
             await settle()
@@ -88,11 +104,14 @@ enum SelfTest {
                 "keyboard at \(demo.keyboard.level), \(model.state.title), modes unchanged: \(model.presets == before)"
             )
 
-            // 6. From Custom, a click closes the panel and goes to whichever of Day
-            // and Away is the bigger change: Day, from screens at 72% and keys at 60%.
+            // 6. With no mode on, a click goes to whichever of Day and Away is the
+            // bigger change: Day, from screens at 72% and keys at 60%. The first
+            // click here only closes the panel.
             await click(bar, at)
             await settle()
-            check("click from Custom", model.state == .day && !panel.isVisible, "\(model.state.title), panel \(panel.isVisible ? "open" : "closed")")
+            await click(bar, at)
+            await settle()
+            check("click with no mode on", model.state == .day && !panel.isVisible, "\(model.state.title), panel \(open())")
 
             print("selftest: \(failures == 0 ? "all checks passed" : "\(failures) check(s) FAILED")")
             Demo.cleanUp()

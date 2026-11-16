@@ -22,12 +22,18 @@ struct Demo {
         model = AppModel(defaultsSuite: Self.suite, displays: displays, keyboard: keyboard, loginService: DemoLoginItem())
     }
 
-    /// Puts the made-up hardware at `preset` and has the model read it.
+    /// Puts the made-up hardware at `preset` and has the model read it. A
+    /// refresh is skipped while the model's own poll is reading, so ask until
+    /// the reading has arrived.
     @MainActor
     func show(_ preset: BrightnessPreset) async {
         displays.set(preset.screen)
         keyboard.set(preset.keyboard)
-        await model.refresh()
+        for _ in 0..<40 {
+            await model.refresh()
+            if model.reading.averageScreen == preset.screen, model.reading.keyboard == preset.keyboard { return }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
     }
 
     static func cleanUp() {
