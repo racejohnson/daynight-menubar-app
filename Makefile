@@ -2,7 +2,7 @@ SWIFT := /usr/bin/swift
 APP := .build/DayNight.app
 INSTALLED := /Applications/DayNight.app
 
-.PHONY: all test app install run hardware-check clean
+.PHONY: all test app install run hardware-check selftest readme clean
 
 all: test app
 
@@ -41,6 +41,17 @@ run: app
 hardware-check:
 	@echo "This changes the real display and keyboard brightness, then restores it."
 	$(SWIFT) run -c release daynight-hardware-check
+
+# Puts the real item in the menu bar and opens the real panel, on made-up
+# displays and a made-up keyboard, and drives them with synthetic clicks. The
+# real brightness and settings are not touched. Keep your hands off for ten seconds.
+selftest: app
+	"$(APP)/Contents/MacOS/DayNight" --selftest
+
+# Redraws the README's pictures in docs from the same made-up Mac, so they
+# come out the same on any machine.
+readme: app
+	"$(APP)/Contents/MacOS/DayNight" --readme docs
 
 clean:
 	$(SWIFT) package clean
