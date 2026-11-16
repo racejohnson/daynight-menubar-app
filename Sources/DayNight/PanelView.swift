@@ -2,52 +2,134 @@ import AppKit
 import DayNightCore
 import SwiftUI
 
-/// The panel's content: the three presets, open at login, and a quiet footer.
+/// The panel: the two levels, the three modes, open at login and a quiet
+/// footer. Laid out as Audio Priority's panel is, so the two read as a pair.
 struct PanelView: View {
     let model: AppModel
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(Mode.allCases, id: \.self) { mode in
-                ModeCard(mode: mode, model: model)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            if let problem = model.problem { Banner(text: problem) }
 
-            VStack(spacing: 10) {
-                LaunchAtLoginRow(launchAtLogin: model.launchAtLogin)
-                if let problem = model.problem {
-                    Label(problem, systemImage: "exclamationmark.triangle")
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Divider()
-                Footer(summary: model.hardwareSummary)
+            VStack(spacing: 8) {
+                LevelSlider(model: model, channel: .screens)
+                LevelSlider(model: model, channel: .keyboard)
             }
-            // Shares its edges with the cards' content (4 + 8).
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
+            .padding(.bottom, 6)
+
+            Heading(
+                title: "Mode",
+                hint: model.displayedState.mode.map { "the sliders set \($0.title)" } ?? "matches none"
+            )
+            VStack(spacing: 1) {
+                ForEach(Mode.allCases, id: \.self) { mode in
+                    ModeRow(mode: mode, model: model)
+                }
+            }
+            Rule()
+
+            LaunchAtLoginRow(launchAtLogin: model.launchAtLogin)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 2)
+
+            Rule()
+            Footer(summary: model.hardwareSummary)
         }
         .padding(10)
-        .frame(width: 300)
+        .frame(width: 312)
         // The panel takes key focus without activating the app; without this its
         // controls would draw in the inactive (grey) style.
         .environment(\.controlActiveState, .key)
     }
 }
 
+// MARK: Small pieces
+
+private struct Rule: View {
+    var body: some View {
+        Divider()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+    }
+}
+
+private struct Banner: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11.5))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(.primary.opacity(0.075)))
+            .padding(.bottom, 8)
+    }
+}
+
+private struct Heading: View {
+    let title: String
+    let hint: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(hint)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 2)
+        .padding(.bottom, 3)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension EnvironmentValues {
+    /// True in the off-screen pictures (`--readme`), where the system switch
+    /// draws grey because its window is not the key window.
+    @Entry var drawsSwitchesForPictures = false
+}
+
+/// A stand-in for the system's mini switch as it looks in the open panel.
+private struct DrawnSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Capsule()
+                .fill(configuration.isOn ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary.opacity(0.16)))
+                .frame(width: 36, height: 17)
+                .overlay(alignment: configuration.isOn ? .trailing : .leading) {
+                    Capsule()
+                        .fill(.white)
+                        .frame(width: 22, height: 13)
+                        .shadow(color: .black.opacity(0.15), radius: 1, y: 0.5)
+                        .padding(2)
+                }
+        }
+    }
+}
+
 private struct LaunchAtLoginRow: View {
     let launchAtLogin: LaunchAtLogin
+    @Environment(\.drawsSwitchesForPictures) private var drawsSwitch
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Toggle(isOn: Binding(get: { launchAtLogin.isEnabled }, set: launchAtLogin.setEnabled)) {
+            let toggle = Toggle(isOn: Binding(get: { launchAtLogin.isEnabled }, set: launchAtLogin.setEnabled)) {
                 Text("Open at Login")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
+            if drawsSwitch {
+                toggle.toggleStyle(DrawnSwitchStyle())
+            } else {
+                toggle.toggleStyle(.switch).controlSize(.mini)
+            }
 
             if let issue = launchAtLogin.issue {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -59,7 +141,7 @@ private struct LaunchAtLoginRow: View {
                             .buttonStyle(.link)
                     }
                 }
-                .font(.subheadline)
+                .font(.system(size: 11))
             }
         }
     }
@@ -80,6 +162,201 @@ private struct Footer: View {
                 .onHover { isHoveringQuit = $0 }
                 .help("Quit DayNight (⌘Q)")
         }
-        .font(.subheadline)
+        .font(.system(size: 11.5))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 2)
+    }
+}
+
+// MARK: Level slider
+
+/// A Control Center–style slider for the screens or the keyboard light. It
+/// shows the mode that is on and sets it as it is dragged; with no mode on it
+/// shows the brightness as it is and sets that, changing no mode.
+private struct LevelSlider: View {
+    enum Channel {
+        case screens, keyboard
+    }
+
+    let model: AppModel
+    let channel: Channel
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var value: Double { channel == .screens ? model.levels.screen : model.levels.keyboard }
+    private var canSet: Bool { channel == .screens ? model.canSetScreen : model.canSetKeyboard }
+    /// The hardware this slider sets is not there. With a mode on, the level
+    /// is still kept for when it is.
+    private var isAway: Bool { channel == .screens ? model.displayCount == 0 : !model.hasKeyboard }
+    private var title: String { channel == .screens ? "Screens" : "Keyboard" }
+    private var spoken: String { channel == .screens ? "Screen brightness" : "Keyboard brightness" }
+
+    private var note: String {
+        guard isAway else { return "" }
+        let missing = channel == .screens ? "No display DayNight can set is connected." : "No keyboard backlight is connected."
+        return canSet ? "\(missing) The level is saved for later." : missing
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width * (canSet ? value : 0)
+            ZStack(alignment: .leading) {
+                // With nothing to set, a fainter, empty track.
+                Capsule().fill(.primary.opacity(canSet ? 0.08 : 0.05))
+                // The label is drawn twice, each copy clipped to its own side of
+                // the edge, so the text stays readable across it and neither
+                // copy shows through the other.
+                label
+                    .foregroundStyle(isAway ? .secondary : .primary)
+                    .mask(alignment: .trailing) { Rectangle().frame(width: max(geometry.size.width - width, 0)) }
+                // White in both appearances, as in Control Center. A plain
+                // colour, because `.primary` goes grey on glass. Grey when the
+                // hardware is away and the level is only being kept.
+                Rectangle()
+                    .fill(isAway ? AnyShapeStyle(.primary.opacity(0.11)) : AnyShapeStyle(Color.white.opacity(0.92)))
+                    .frame(width: width)
+                label
+                    .foregroundStyle(isAway ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.black))
+                    .mask(alignment: .leading) { Rectangle().frame(width: width) }
+            }
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { drag in
+                    guard canSet, geometry.size.width > 0 else { return }
+                    set(min(max(drag.location.x / geometry.size.width, 0), 1))
+                }
+                .onEnded { _ in model.endLevelEdit() })
+            // The fill glides when the mode changes, as the brightness fades,
+            // and follows a drag exactly.
+            .animation(reduceMotion ? nil : .smooth(duration: 0.6), value: model.displayedState)
+        }
+        .frame(height: 30)
+        // Focus comes from the keyboard only (Tab, with keyboard navigation
+        // on), so a click leaves no focus ring behind.
+        .focusable(canSet, interactions: .activate)
+        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+            guard canSet else { return .ignored }
+            // A sixteenth, as the brightness keys step; Option steps by one percent.
+            let step = press.modifiers.contains(.option) ? 0.01 : 1.0 / 16
+            let isUp = press.key == .rightArrow || press.key == .upArrow
+            set(min(max(value + (isUp ? step : -step), 0), 1))
+            model.endLevelEdit()
+            return .handled
+        }
+        .accessibilityRepresentation {
+            Slider(
+                value: Binding(get: { value }, set: { set($0) }), in: 0...1, step: 1.0 / 16,
+                label: { Text(spoken) },
+                onEditingChanged: { isEditing in
+                    if !isEditing { model.endLevelEdit() }
+                }
+            )
+            .disabled(!canSet)
+            .accessibilityValue("\(Int((value * 100).rounded())) percent")
+            .accessibilityHint(note)
+        }
+        .help(note)
+    }
+
+    private func set(_ level: Double) {
+        channel == .screens ? model.setScreen(level) : model.setKeyboard(level)
+    }
+
+    private var label: some View {
+        HStack(spacing: 8) {
+            Image(systemName: channel == .screens ? "display" : "keyboard")
+                .symbolRenderingMode(.monochrome)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 24)
+            Text(title)
+                .font(.system(size: 11.5, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            if canSet {
+                Text(value, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .opacity(0.6)
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 11)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: Mode rows
+
+/// One mode: click it to fade to it. The one that is on is filled with its colour.
+private struct ModeRow: View {
+    let mode: Mode
+    let model: AppModel
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovering = false
+    @FocusState private var isFocused: Bool
+
+    private var isActive: Bool { model.displayedState.mode == mode }
+    private var isFading: Bool { model.fadingTo == mode }
+
+    private var detail: String {
+        let preset = model.preset(for: mode)
+        return "Screens \(Self.percent(preset.screen)) · Keyboard \(Self.percent(preset.keyboard))"
+    }
+
+    private static func percent(_ value: Double) -> String { "\(Int((value * 100).rounded()))%" }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: mode.symbolName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .symbolEffect(.pulse, options: .repeat(.continuous), isActive: isFading && !reduceMotion)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(isActive ? AnyShapeStyle(.white.opacity(0.24)) : AnyShapeStyle(.primary.opacity(0.075))))
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(mode.title)
+                    .font(.system(size: 13, weight: isActive ? .semibold : .medium))
+                Text(detail)
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+            }
+            .foregroundStyle(isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .lineLimit(1)
+
+            Spacer(minLength: 2)
+        }
+        // The right edge lines up with the heading, the rules and the switch.
+        .padding(.leading, 8)
+        .padding(.trailing, 10)
+        .frame(height: 38)
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isActive ? AnyShapeStyle(mode.tint) : AnyShapeStyle(.primary.opacity(isHovering || isFocused ? 0.055 : 0)))
+        }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: isActive)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .onTapGesture {
+            // A click focuses the row; let go, so its fill does not outstay the pointer.
+            isFocused = false
+            model.apply(mode)
+        }
+        .focusable()
+        .focused($isFocused)
+        // No system focus ring: a click focuses the row, and the ring then
+        // reads as a stray border. A focused row takes the hover fill instead.
+        .focusEffectDisabled()
+        .onKeyPress(keys: [.return, .space]) { _ in
+            model.apply(mode)
+            return .handled
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(mode.title)
+        .accessibilityValue(detail)
+        .accessibilityHint("Fades to \(mode.title)")
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { model.apply(mode) }
     }
 }

@@ -19,24 +19,15 @@ extension Mode {
         }
     }
 
-    /// Night's blue is the app icon's: its night sky in light mode, and the
-    /// lighter blue of its glow in dark mode, where the sky colour would vanish.
+    /// The fill of the row that is on, under white text. Day is the app icon's
+    /// sun, deeper than system orange so the text reads. Night is the icon's
+    /// night sky in light mode, and the lighter blue of its glow in dark mode,
+    /// where the sky colour would vanish.
     var tint: Color {
         switch self {
-        case .day: .orange
+        case .day: Color(light: (224, 94, 38), dark: (238, 116, 69))
         case .away: Color(light: (140, 78, 181), dark: (173, 106, 219))
         case .night: Color(light: (42, 50, 111), dark: (74, 86, 184))
-        }
-    }
-
-    /// How strongly the active card is filled with the tint. The darker tints
-    /// need more, or the card reads as grey.
-    func fillOpacity(_ scheme: ColorScheme) -> Double {
-        let isDark = scheme == .dark
-        return switch self {
-        case .day: isDark ? 0.15 : 0.11
-        case .away: isDark ? 0.16 : 0.12
-        case .night: isDark ? 0.20 : 0.16
         }
     }
 }
@@ -53,9 +44,4 @@ private extension Color {
 
 extension BrightnessState {
     var title: String { mode?.title ?? "Custom" }
-
-    /// Custom is drawn as a half-filled circle: the same weight as the sun and
-    /// moon, and the glyph macOS already uses for an appearance that is
-    /// neither light nor dark.
-    var symbolName: String { mode?.symbolName ?? "circle.lefthalf.filled" }
 }

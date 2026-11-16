@@ -2,11 +2,11 @@ import AppKit
 import DayNightCore
 import Observation
 
-/// The menu-bar icon. Click swaps Day and Away; Option-click goes to Night;
-/// right-click or Control-click opens the panel.
+/// The menu-bar capsule. Click swaps Day and Away; Option-click goes to
+/// Night; right-click or Control-click opens the panel.
 @MainActor
 final class StatusItemController: NSObject {
-    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let model: AppModel
     private let panel: PanelController
 
@@ -18,7 +18,9 @@ final class StatusItemController: NSObject {
         guard let button = item.button else { return }
         button.target = self
         button.action = #selector(clicked(_:))
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        // On mouse down, like the system's own menu-bar items, so the toggle
+        // and the panel's outside-click monitor see the same moment.
+        button.sendAction(on: [.leftMouseDown, .rightMouseDown])
         panel.onVisibilityChange = { [weak button] isVisible in
             button?.highlight(isVisible)
         }
@@ -29,9 +31,12 @@ final class StatusItemController: NSObject {
         }
     }
 
+    /// The capsule's button, for the self-test to click.
+    var button: NSStatusBarButton? { item.button }
+
     @objc private func clicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+        if event?.type == .rightMouseDown || event?.modifierFlags.contains(.control) == true {
             panel.toggle(below: sender)
         } else {
             panel.close()
@@ -42,8 +47,7 @@ final class StatusItemController: NSObject {
     private func show(_ state: BrightnessState) {
         guard let button = item.button else { return }
         let label = "DayNight: \(state.title)"
-        button.image = NSImage(systemSymbolName: state.symbolName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+        button.image = Glyphs.trio(state)
         button.toolTip = label
         button.setAccessibilityLabel(label)
     }

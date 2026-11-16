@@ -96,4 +96,9 @@ public struct HardwareSnapshot: Equatable, Sendable {
     public var channelCount: Int {
         displays.count + (keyboard == nil ? 0 : 1)
     }
+
+    /// One level for all the displays: their average, or nil when there are none.
+    public var averageScreen: Double? {
+        displays.isEmpty ? nil : displays.values.reduce(0, +) / Double(displays.count)
+    }
 }

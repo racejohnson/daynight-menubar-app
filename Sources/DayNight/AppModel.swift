@@ -14,6 +14,10 @@ final class AppModel {
     private(set) var presets: Presets
     private(set) var displayCount = 0
     private(set) var hasKeyboard = false
+    /// The last hardware reading: the levels to show when no mode is on.
+    private(set) var reading = HardwareSnapshot()
+    /// The levels being dragged while no mode is on. The hardware trails them.
+    private(set) var customLevels: BrightnessPreset?
     private(set) var controlProblem: String?
     /// The last attempt to restore auto-brightness left by an unclean quit.
     private(set) var leftoverRecovery: AutoBrightnessResult = .nothingToDo
@@ -25,7 +29,11 @@ final class AppModel {
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var isShuttingDown = false
     @ObservationIgnored private var toggleTask: Task<Void, Never>?
-    @ObservationIgnored private var pendingPreview: BrightnessPreset?
+    @ObservationIgnored private var pendingPreview: Write?
+    /// What the panel's sliders are setting, held for the length of one drag
+    /// so that passing another mode's levels cannot change the target.
+    @ObservationIgnored private var editTarget: BrightnessState?
+    @ObservationIgnored private var editID = 0
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [(NotificationCenter, any NSObjectProtocol)] = []
@@ -70,6 +78,18 @@ final class AppModel {
     func preset(for mode: Mode) -> BrightnessPreset {
         presets[mode]
     }
+
+    /// What the panel's two sliders show: the levels of the mode that is on,
+    /// or else the brightness as it is.
+    var levels: BrightnessPreset {
+        if let mode = displayedState.mode { return presets[mode] }
+        return customLevels ?? BrightnessPreset(screen: reading.averageScreen ?? 0, keyboard: reading.keyboard ?? 0)
+    }
+
+    /// With a mode on, a slider sets that mode even when its hardware is away.
+    /// With none on, there has to be something to set.
+    var canSetScreen: Bool { displayedState.mode != nil || displayCount > 0 }
+    var canSetKeyboard: Bool { displayedState.mode != nil || hasKeyboard }
 
     // MARK: Lifecycle
 
@@ -132,6 +152,8 @@ final class AppModel {
         transitionID += 1
         let id = transitionID
         pendingPreview = nil
+        editTarget = nil
+        customLevels = nil
         fadingTo = mode
         settings.lastApplied = mode
         Task {
@@ -155,6 +177,34 @@ final class AppModel {
         var preset = preset(for: mode)
         preset.keyboard = value
         update(preset, for: mode)
+    }
+
+    /// The panel's Screens slider: sets the mode that is on, or with none on
+    /// sets the displays and changes no mode.
+    func setScreen(_ value: Double) {
+        guard canSetScreen else { return }
+        setLevel(screens: true, keyboard: false) { $0.screen = value }
+    }
+
+    /// The panel's Keyboard slider, on the same terms.
+    func setKeyboard(_ value: Double) {
+        guard canSetKeyboard else { return }
+        setLevel(screens: false, keyboard: true) { $0.keyboard = value }
+    }
+
+    /// The drag is over: let the last write land, then read the hardware again.
+    /// Levels left matching a mode now count as that mode.
+    func endLevelEdit() {
+        guard editTarget != nil else { return }
+        let id = editID
+        Task {
+            await previewTask?.value
+            // A newer drag ends itself.
+            guard id == editID else { return }
+            editTarget = nil
+            await refresh()
+            customLevels = nil
+        }
     }
 
     // MARK: Refresh
@@ -190,7 +240,8 @@ final class AppModel {
         }
 
         guard !isWriting else { return }
-        state = infer(snapshot)
+        self.reading = snapshot
+        state = editTarget ?? infer(snapshot)
     }
 
     // MARK: Private
@@ -219,18 +270,53 @@ final class AppModel {
         transitionID += 1
         fadingTo = nil
         state = BrightnessState(mode)
-        preview(preset)
+        settings.lastApplied = mode
+        preview(Write(preset: preset))
+    }
+
+    private func setLevel(screens: Bool, keyboard: Bool, _ change: (inout BrightnessPreset) -> Void) {
+        guard !isShuttingDown else { return }
+        editID += 1
+        let target = editTarget ?? displayedState
+        editTarget = target
+        if let mode = target.mode {
+            var preset = presets[mode]
+            change(&preset)
+            update(preset, for: mode)
+        } else {
+            // No mode is on: write only the channel being dragged, so a drag on
+            // Screens leaves the keyboard, and its auto-brightness, alone.
+            var levels = levels
+            change(&levels)
+            customLevels = levels
+            preview(Write(preset: levels, screens: screens, keyboard: keyboard))
+        }
+    }
+
+    /// One instant write, to every display, the keyboard, or both.
+    private struct Write {
+        var preset: BrightnessPreset
+        var screens = true
+        var keyboard = true
     }
 
     /// Applies slider edits instantly. Edits that arrive while a write is in
     /// flight collapse into one, so a fast drag never queues a backlog.
-    private func preview(_ preset: BrightnessPreset) {
-        pendingPreview = preset
+    private func preview(_ write: Write) {
+        var write = write
+        if let waiting = pendingPreview {
+            write.screens = write.screens || waiting.screens
+            write.keyboard = write.keyboard || waiting.keyboard
+        }
+        pendingPreview = write
         guard previewTask == nil else { return }
         previewTask = Task {
             while let next = pendingPreview {
                 pendingPreview = nil
-                let report = await hardware.transition(to: next, duration: .zero)
+                let report = await hardware.transition(
+                    to: next.preset, duration: .zero,
+                    displays: next.screens ? nil : [], includeKeyboard: next.keyboard
+                )
                 if !report.cancelled { controlProblem = Self.problem(in: report) }
             }
             previewTask = nil
