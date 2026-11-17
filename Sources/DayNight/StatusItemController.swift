@@ -55,11 +55,22 @@ final class StatusItemController: NSObject {
         // Only a mouse click carries a button and modifiers worth reading. An
         // accessibility press leaves whatever event came before it in place.
         let click = NSApp.currentEvent.flatMap { [.leftMouseDown, .rightMouseDown].contains($0.type) ? $0 : nil }
-        if click?.type == .rightMouseDown || click?.modifierFlags.contains(.control) == true {
+        let modifiers = Self.modifiers(of: click, held: NSEvent.modifierFlags)
+        if click?.type == .rightMouseDown || modifiers.contains(.control) {
             panel.toggle(below: sender)
         } else if !panel.dismiss() {
-            model.toggle(alternate: click?.modifierFlags.contains(.option) == true)
+            model.toggle(alternate: modifiers.contains(.option))
         }
+    }
+
+    /// The keys held for a mouse click: those the event carries, plus those
+    /// held on the keyboard as it arrives. On macOS 27 the menu bar is drawn
+    /// by another process, which passes a click on without its modifiers, so
+    /// an Option-click arrives looking like a plain one. An accessibility
+    /// press (no click) counts as plain whatever is held.
+    static func modifiers(of click: NSEvent?, held: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
+        guard let click else { return [] }
+        return click.modifierFlags.union(held).intersection(.deviceIndependentFlagsMask)
     }
 
     private func show(_ state: BrightnessState) {
